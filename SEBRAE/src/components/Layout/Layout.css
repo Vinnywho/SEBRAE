@@ -154,3 +154,45 @@ nav {
   padding: 30px;
   overflow-y: auto;
 }
+
+.sidebar-mobile-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-mobile-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.4); /* Fundo levemente escurecido */
+    z-index: 999;
+    backdrop-filter: blur(2px);
+  }
+  
+  .sidebar {
+    transition: all 0.3s ease;
+    position: fixed;
+    z-index: 1000;
+    height: 100%;
+    left: 0;
+    top: 0;
+  }
+  
+  .sidebar.closed {
+    transition: all 0.3s ease;
+    transform: translateX(-100%);
+    width: 260px;
+    padding: 0;
+  }
+  
+  .top-header {
+    padding: 0 15px;
+  }
+  
+  .page-content {
+    padding: 15px;
+  }
+}

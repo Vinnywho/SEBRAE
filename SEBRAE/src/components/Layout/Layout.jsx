@@ -10,13 +10,11 @@ import './Layout.css';
 const Layout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [searchTerm, setSearchTerm] = useState(''); 
-    // 1. Novo estado para armazenar o email do usuário logado
     const [userEmail, setUserEmail] = useState(''); 
     
     const navigate = useNavigate();
     const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
 
-    // 2. Busca os dados do usuário autenticado assim que o Layout é montado
     useEffect(() => {
         const getLoggedUser = async () => {
             const { data: { user }, error } = await supabase.auth.getUser();
@@ -28,7 +26,7 @@ const Layout = () => {
         };
         
         getLoggedUser();
-    }, []); // Array vazio garante que rode apenas uma vez ao renderizar
+    }, []); 
 
     const handleLogout = async () => {
         try {
@@ -60,6 +58,9 @@ const Layout = () => {
 
     return (
         <div className="layout-wrapper">
+            {/* NOVA LINHA: Fundo escuro clicável que aparece no mobile para fechar a sidebar */}
+            {isSidebarOpen && <div className="sidebar-mobile-overlay" onClick={toggleSidebar}></div>}
+
             <aside className={`sidebar ${!isSidebarOpen ? 'closed' : ''}`}>
                 <div className="sidebar-logos">
                     <img src={logos} alt="logos" className="logos" />
@@ -103,7 +104,6 @@ const Layout = () => {
                 <header className="top-header">
                     <button className="hamburger-menu" onClick={toggleSidebar}>☰</button>
                     <div className="user-profile">
-                        {/* 3. A palavra "Karina" substituída pela chamada dinâmica do estado */}
                         <span className="user-name">{userEmail || 'Carregando...'}</span>
                     </div>
                 </header>

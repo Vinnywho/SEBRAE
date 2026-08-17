@@ -124,3 +124,34 @@
 .btn-submit:hover {
   opacity: 0.9;
 }
+
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-4 {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .os-form section {
+    overflow-x: visible;
+  }
+  
+  .details-header-row {
+    min-width: 100%;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .details-header-row span {
+    flex: 1 1 45%;
+    text-align: left !important;
+    margin-bottom: 5px;
+  }
+  
+  .align-end {
+    align-items: stretch;
+  }
+
+  .btn-blue {
+    margin-top: 10px;
+  }
+}
