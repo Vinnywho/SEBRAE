@@ -354,7 +354,7 @@ const OSForm = () => {
         </div>
         <div className="grid-3">
            <div className="input-block"><label>Agendamento</label><input type="date" name="agendamento" value={dadosResponsavelSelecionado.agendamento || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado} /></div>
-           <div className="input-block"><label>Status do pagamento</label><select name="statusPagamento" value={dadosResponsavelSelecionado.statusPagamento || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado}><option value="">Selecione</option><option value="Pago">Pago</option><option value="Pendente">Pendente</option></select></div>
+           <div className="input-block"><label>Status do pagamento</label><select className={`payment-status-select status-${(dadosResponsavelSelecionado.statusPagamento || 'empty').toLowerCase()}`} name="statusPagamento" value={dadosResponsavelSelecionado.statusPagamento || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado}><option value="">Selecione</option><option value="Pago">Pago</option><option value="Pendente">Pendente</option></select></div>
            <div className="input-block"><label>Data do pagamento</label><input type="date" name="dataPagamento" value={dadosResponsavelSelecionado.dataPagamento || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado} /></div>
         </div>
       </section>

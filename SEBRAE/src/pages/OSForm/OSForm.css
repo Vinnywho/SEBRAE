@@ -41,6 +41,28 @@
   color: #333;
 }
 
+.payment-status-select {
+  border: 2px solid transparent;
+  font-weight: 600;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.payment-status-select.status-pago {
+  background-color: #dcfce7;
+  border-color: #22c55e;
+  color: #166534;
+}
+
+.payment-status-select.status-pendente {
+  background-color: #f9d5d5;
+  border-color: #f50b0b48; 
+  color: #7a0707;
+}
+
+.payment-status-select.status-empty {
+  color: #666;
+}
+
 .input-block textarea {
   min-height: 100px;
   resize: vertical;
