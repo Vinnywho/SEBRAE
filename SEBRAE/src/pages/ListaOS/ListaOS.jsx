@@ -1,216 +1,357 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
-import edit from '../../assets/icons/edit.svg';
-import delet from '../../assets/icons/delet.svg';
+import { useNavigate } from 'react-router-dom';
+import { useConfig } from '../../context/ConfigContext';
+import { isRecentlyEdited } from '../../utils/format';
+import { Edit2, Trash2, Search, Plus, Clock, FileText, Download, CheckSquare, Filter } from 'lucide-react';
 import './ListaOS.css';
 
 const ListaOS = () => {
-  const [osList, setOsList] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  
   const navigate = useNavigate();
+  const [listaOS, setListaOS] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [filtroSemNfs, setFiltroSemNfs] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Bulk Actions
+  const [selectedOSs, setSelectedOSs] = useState([]);
+  const [bulkNfsE, setBulkNfsE] = useState('');
+
+  const { diasEdicaoRecente } = useConfig();
 
   useEffect(() => {
-    const fetchOS = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('ordens_servico')
-          .select('*, os_detalhes(*), os_responsaveis(*)');
-
-        if (error) throw error;
-        setOsList(data || []);
-      } catch (error) {
-        console.error("Erro ao buscar as Ordens de Serviço:", error);
-        alert("Erro ao carregar os dados.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchOS();
   }, []);
 
-  const handleEdit = (numero_os) => {
-    navigate(`/os-form?id=${numero_os}`);
+  const fetchOS = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('ordens_servico')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) console.error("Erro ao buscar OS:", error);
+    else setListaOS(data || []);
+    setIsLoading(false);
   };
 
-  const handleDelete = async (numero_os) => {
-    const confirmar = window.confirm(`Tem certeza que deseja excluir a OS ${numero_os}? Isso apagará todos os detalhes vinculados.`);
-    if (!confirmar) return;
-
+  const deletarOS = async (numero_os) => {
+    if (!window.confirm(`Tem certeza que deseja deletar a OS ${numero_os}? Essa ação não pode ser desfeita.`)) return;
     try {
       const { error } = await supabase
         .from('ordens_servico')
         .delete()
         .eq('numero_os', numero_os);
-
       if (error) throw error;
-      setOsList(osList.filter(os => os.numero_os !== numero_os));
-    } catch (error) {
-      console.error("Erro ao excluir OS:", error);
-      alert("Erro ao excluir. Tente novamente.");
+      setListaOS(listaOS.filter(os => os.numero_os !== numero_os));
+      setSelectedOSs(prev => prev.filter(id => id !== numero_os));
+    } catch (err) {
+      alert("Erro ao deletar OS: " + err.message);
     }
   };
 
-  const filteredList = osList.filter(os => {
-    if (!startDate && !endDate) return true;
-    if (!os.os_detalhes || os.os_detalhes.length === 0) return false;
+  // Filtros aplicados em memória
+  const filteredOS = listaOS.filter(os => {
+    const matchesSearch = os.numero_os.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (os.endereco && os.endereco.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    let matchesDate = true;
+    if (dataInicio) {
+      matchesDate = matchesDate && new Date(os.created_at) >= new Date(dataInicio);
+    }
+    if (dataFim) {
+      const fim = new Date(dataFim);
+      fim.setHours(23, 59, 59, 999);
+      matchesDate = matchesDate && new Date(os.created_at) <= fim;
+    }
 
-    return os.os_detalhes.some(detalhe => {
-      const dataServico = detalhe.data_servico;
-      if (!dataServico) return false;
-
-      let isValid = true;
-      if (startDate && dataServico < startDate) isValid = false;
-      if (endDate && dataServico > endDate) isValid = false;
-      
-      return isValid;
-    });
+    let matchesNfs = true;
+    if (filtroSemNfs) {
+      matchesNfs = !os.nfs_e || os.nfs_e.trim() === '';
+    }
+    
+    return matchesSearch && matchesDate && matchesNfs;
   });
 
-  const handleExportCSV = () => {
-    if (filteredList.length === 0) return;
+  // Bulk Actions Handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) setSelectedOSs(filteredOS.map(o => o.numero_os));
+    else setSelectedOSs([]);
+  };
 
-    const headers = [
-      "Número da OS", "Lote", "Endereço", "Adicionais", "Observações",
-      "Valor unitário total", "Custo responsável", "NFS-e", "Valor ISS", "Valor HL", "Lucro previsto",
-      "Detalhe - Nome do Responsável", "Detalhe - Serviço", "Detalhe - Data", 
-      "Detalhe - Horário Gravação", "Detalhe - Horário Saída", "Detalhe - Data de Pagamento", "Detalhe - Valor Unitário"
-    ];
+  const handleSelect = (numero_os, checked) => {
+    if (checked) setSelectedOSs(prev => [...prev, numero_os]);
+    else setSelectedOSs(prev => prev.filter(id => id !== numero_os));
+  };
 
-    const formatCell = (val, isNumeric = false) => {
-      if (val === null || val === undefined || val === '') return '""';
+  const aplicarNfsE = async () => {
+    if (!bulkNfsE.trim()) return alert('Digite o número da NFS-e que deseja aplicar.');
+    try {
+      const { error } = await supabase
+        .from('ordens_servico')
+        .update({ nfs_e: bulkNfsE })
+        .in('numero_os', selectedOSs);
+        
+      if (error) throw error;
       
-      let formattedVal = String(val);
-      
-      if (isNumeric) {
-        // Trava os decimais gerados na precisão em duas casas e troca o ponto pela vírgula
-        formattedVal = Number(val).toFixed(2).replace('.', ',');
-      } else if (/^\d+$/.test(formattedVal) && formattedVal.length > 10) {
-        // Evita que o Excel converta "Números da OS" muito longos em notação científica (ex: 2E+15)
-        return `="${formattedVal}"`;
+      alert('NFS-e atribuída com sucesso para as OSs selecionadas!');
+      setBulkNfsE('');
+      setSelectedOSs([]);
+      fetchOS(); // Recarrega para ver as mudanças
+    } catch (err) {
+      alert('Erro ao atribuir NFS-e: ' + err.message);
+    }
+  };
+
+  const exportToCSV = async () => {
+    if (filteredOS.length === 0) return alert('Não há dados para exportar com os filtros atuais.');
+    
+    setIsLoading(true);
+    try {
+      // Divide em lotes de 100 para não estourar o limite de URL da API do Supabase
+      const osNumbers = filteredOS.map(o => o.numero_os);
+      const detalhesPorOs = {};
+      const responsaveisPorOs = {};
+
+      const chunkSize = 100;
+      for (let i = 0; i < osNumbers.length; i += chunkSize) {
+        const chunk = osNumbers.slice(i, i + chunkSize);
+        
+        const { data: detData } = await supabase.from('os_detalhes').select('*').in('numero_os', chunk);
+        if (detData) {
+          detData.forEach(d => {
+            if (!detalhesPorOs[d.numero_os]) detalhesPorOs[d.numero_os] = [];
+            detalhesPorOs[d.numero_os].push(d);
+          });
+        }
+
+        const { data: respData } = await supabase.from('os_responsaveis').select('*').in('numero_os', chunk);
+        if (respData) {
+          respData.forEach(r => {
+            if (!responsaveisPorOs[r.numero_os]) responsaveisPorOs[r.numero_os] = [];
+            responsaveisPorOs[r.numero_os].push(r);
+          });
+        }
       }
-      
-      return `"${formattedVal.replace(/"/g, '""')}"`;
-    };
 
-    let csvRows = [];
-    csvRows.push(headers.join(";"));
-
-    filteredList.forEach(os => {
-      const baseData = [
-        formatCell(os.numero_os), 
-        formatCell(os.lote), 
-        formatCell(os.endereco), 
-        formatCell(os.adicionais), 
-        formatCell(os.observacoes),
-        formatCell(os.valor_unitario_total, true),
-        formatCell(os.curso_responsavel, true), 
-        formatCell(os.nfs_e), 
-        formatCell(os.valor_iss, true), 
-        formatCell(os.valor_hl, true), 
-        formatCell(os.lucro_previsto, true)
+      const headers = [
+        'Número da OS', 'Lote', 'Endereço', 'Adicionais', 'Observações',
+        'Valor unitário total', 'Custo responsável', 'NFS-e', 'Valor ISS', 'Lucro previsto',
+        'Detalhe - Nome do Responsável', 'Detalhe - Serviço', 'Detalhe - Data',
+        'Detalhe - Horário Gravação', 'Detalhe - Horário Saída', 'Detalhe - Data de Pagamento', 'Detalhe - Valor Unitário'
       ];
 
-      if (os.os_detalhes && os.os_detalhes.length > 0) {
-        os.os_detalhes.forEach(detalhe => {
-          
-          let dataPagamento = '';
-          if (os.os_responsaveis) {
-            const responsavelEncontrado = os.os_responsaveis.find(r => r.nome === detalhe.responsavel_servico);
-            if (responsavelEncontrado && responsavelEncontrado.data_pagamento) {
-              dataPagamento = responsavelEncontrado.data_pagamento;
-            }
-          }
+      const csvRows = [];
 
-          const detalheData = [
-            formatCell(detalhe.responsavel_servico),
-            formatCell(detalhe.servico),
-            formatCell(detalhe.data_servico),
-            formatCell(detalhe.horario_gravacao),
-            formatCell(detalhe.horario_saida),
-            formatCell(dataPagamento),
-            formatCell(detalhe.valor_unitario, true)
-          ];
-          
-          csvRows.push([...baseData, ...detalheData].join(";"));
-        });
-      } else {
-        csvRows.push([...baseData, '""', '""', '""', '""', '""', '""', '""'].join(";"));
-      }
-    });
+      filteredOS.forEach(os => {
+        const detalhes = detalhesPorOs[os.numero_os] || [];
+        const responsaveis = responsaveisPorOs[os.numero_os] || [];
 
-    const csvContent = "\uFEFF" + csvRows.join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "lista_ordens_servico.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        if (detalhes.length === 0) {
+          csvRows.push([
+            os.numero_os, os.lote, os.endereco, os.adicionais, os.observacoes,
+            os.valor_unitario_total, os.curso_responsavel, os.nfs_e, os.valor_iss, os.lucro_previsto,
+            '', '', '', '', '', '', ''
+          ]);
+        } else {
+          detalhes.forEach(det => {
+            const resp = responsaveis.find(r => r.nome === det.responsavel_servico) || {};
+            csvRows.push([
+              os.numero_os, os.lote, os.endereco, os.adicionais, os.observacoes,
+              os.valor_unitario_total, os.curso_responsavel, os.nfs_e, os.valor_iss, os.lucro_previsto,
+              det.responsavel_servico, det.servico,
+              det.data_servico ? det.data_servico.split('-').reverse().join('/') : '',
+              det.horario_gravacao, det.horario_saida,
+              resp.data_pagamento ? resp.data_pagamento.split('-').reverse().join('/') : '',
+              det.valor_unitario
+            ]);
+          });
+        }
+      });
+
+      const formatCell = (val) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""').replace(/\n/g, ' '); // remove quebras de linha para n quebrar o CSV
+        return `"${str}"`;
+      };
+
+      const csvData = csvRows.map(row => row.map(formatCell).join(';'));
+      const csvContent = '\uFEFF' + headers.join(';') + '\n' + csvData.join('\n');
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `Exportacao_OS_Detalhada_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert("Erro ao exportar: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <div className="lista-os-container">
-      <div className="lista-os-header">
-        <h2>Ordens de Serviço Cadastradas</h2>
-        
-        <div className="header-actions">
-          <div className="date-filter">
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} title="Data inicial" />
-            <span>até</span>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} title="Data final" />
-          </div>
-          
-          <button onClick={handleExportCSV} className="btn-export">Exportar CSV</button>
-          <button onClick={() => navigate('/os-form')} className="btn-new-os">+ Nova OS</button>
+      <div className="lista-header">
+        <div>
+          <h2>Ordens de Serviço</h2>
+          <p className="text-muted">Gerencie todas as OS cadastradas no sistema (clique na linha para visualizar)</p>
+        </div>
+        <div style={{display: 'flex', gap: '10px'}}>
+          <button className="btn-outline" onClick={exportToCSV}>
+            <Download size={18} /> Exportar CSV
+          </button>
+          <button className="btn-primary" onClick={() => navigate('/os-form')}>
+            <Plus size={18} /> Nova OS
+          </button>
         </div>
       </div>
 
-      <div className="table-wrapper">
+      {selectedOSs.length > 0 && (
+        <div className="bulk-actions-bar">
+          <CheckSquare size={20} color="#1e3a8a" />
+          <span>{selectedOSs.length} {selectedOSs.length === 1 ? 'OS selecionada' : 'OS selecionadas'}</span>
+          <div style={{width: 1, height: 24, background: '#bfdbfe', margin: '0 10px'}}></div>
+          <input 
+            type="text" 
+            placeholder="Nº da Nota Fiscal (NFS-e)" 
+            value={bulkNfsE}
+            onChange={(e) => setBulkNfsE(e.target.value)}
+          />
+          <button className="btn-primary" onClick={aplicarNfsE}>Atribuir NFS-e</button>
+          <button className="btn-outline" style={{marginLeft: 'auto'}} onClick={() => setSelectedOSs([])}>Cancelar seleção</button>
+        </div>
+      )}
+
+      <div className="card list-card">
+        <div className="list-filters">
+          <div className="filters-row">
+            <div className="search-wrapper">
+              <Search size={18} className="search-icon" />
+              <input 
+                type="text" 
+                placeholder="Buscar por número ou endereço..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="date-filters">
+              <div className="date-filter-group">
+                <label>De:</label>
+                <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+              </div>
+              <div className="date-filter-group">
+                <label>Até:</label>
+                <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+              </div>
+              <button 
+                className={`btn-outline ${filtroSemNfs ? 'active' : ''}`} 
+                onClick={() => setFiltroSemNfs(!filtroSemNfs)}
+                style={{
+                  marginLeft: '10px', 
+                  backgroundColor: filtroSemNfs ? '#ebf8f2' : 'transparent', 
+                  borderColor: filtroSemNfs ? '#10b981' : '#e5e7eb',
+                  color: filtroSemNfs ? '#047857' : '#4b5563',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Filter size={16} />
+                {filtroSemNfs ? 'Apenas Sem NFS-e' : 'Filtrar Sem NFS-e'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {isLoading ? (
-          <p className="loading-text">Carregando ordens de serviço...</p>
+          <div style={{padding: '30px', textAlign: 'center'}}>Carregando...</div>
         ) : (
-          <table className="os-table">
-            <thead>
-              <tr>
-                <th>Número da OS</th>
-                <th>Lote</th>
-                <th>Custo Responsável</th>
-                <th>Lucro Previsto</th>
-                <th className="action-column">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredList.length === 0 ? (
+          <div className="table-responsive">
+            <table className="table data-table table-hover">
+              <thead>
                 <tr>
-                  <td colSpan="5" className="empty-state">Nenhuma Ordem de Serviço encontrada.</td>
+                  <th style={{width: '40px', textAlign: 'center'}}>
+                    <input 
+                      type="checkbox" 
+                      checked={filteredOS.length > 0 && selectedOSs.length === filteredOS.length} 
+                      onChange={handleSelectAll} 
+                    />
+                  </th>
+                  <th>Nº OS</th>
+                  <th>Criação</th>
+                  <th>Lote</th>
+                  <th>Endereço</th>
+                  <th>Faturamento</th>
+                  <th>NFS-e</th>
+                  <th>Conta Azul</th>
+                  <th style={{textAlign: 'right'}}>Ações</th>
                 </tr>
-              ) : (
-                filteredList.map((os) => (
-                  <tr key={os.numero_os}>
-                    <td className="fw-bold">{os.numero_os}</td>
-                    <td id="lote">{os.lote}</td>
-                    <td>R$ {Number(os.curso_responsavel || 0).toFixed(2).replace('.', ',')}</td>
-                    <td>R$ {Number(os.lucro_previsto || 0).toFixed(2).replace('.', ',')}</td>
-                    <td className="action-column">
-                      <button className="btn-icon edit" onClick={() => handleEdit(os.numero_os)}><img src={edit} alt="Editar" /></button>
-                      <button className="btn-icon delete" onClick={() => handleDelete(os.numero_os)}><img src={delet} alt="Excluir" /></button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredOS.length > 0 ? filteredOS.map((os) => {
+                  const recent = isRecentlyEdited(os.updated_at, diasEdicaoRecente);
+                  return (
+                    <tr 
+                      key={os.numero_os} 
+                      onClick={(e) => {
+                        if (e.target.closest('.action-btn') || e.target.closest('.row-checkbox')) return;
+                        navigate(`/os-form?id=${os.numero_os}&view=true`);
+                      }}
+                      style={{cursor: 'pointer'}}
+                      title="Clique para visualizar detalhes"
+                      className={selectedOSs.includes(os.numero_os) ? 'selected-row' : ''}
+                    >
+                      <td className="row-checkbox" style={{textAlign: 'center'}} onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedOSs.includes(os.numero_os)} 
+                          onChange={(e) => handleSelect(os.numero_os, e.target.checked)} 
+                        />
+                      </td>
+                      <td className="fw-bold">
+                        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                          <FileText size={16} className="text-muted" />
+                          {os.numero_os}
+                          {recent && <span className="recent-indicator" title={`Editada nos últimos ${diasEdicaoRecente} dias`}><Clock size={14} /></span>}
+                        </div>
+                      </td>
+                      <td>{new Date(os.created_at).toLocaleDateString('pt-BR')}</td>
+                      <td>{os.lote || '-'}</td>
+                      <td>{os.endereco || '-'}</td>
+                      <td>R$ {Number(os.valor_unitario_total || 0).toFixed(2).replace('.', ',')}</td>
+                      <td>
+                        {os.nfs_e ? (
+                          <span>{os.nfs_e}</span>
+                        ) : (
+                          <span className="badge danger" style={{opacity: 0.8}}>S/ Nota</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`badge ${os.status_conta_azul === 'Concluído' ? 'success' : 'warning'}`}>
+                          {os.status_conta_azul || 'Pendente'}
+                        </span>
+                      </td>
+                      <td style={{textAlign: 'right'}}>
+                        <button className="action-btn" onClick={(e) => { e.stopPropagation(); navigate(`/os-form?id=${os.numero_os}`); }} title="Editar OS"><Edit2 size={16} /></button>
+                        <button className="action-btn danger" onClick={(e) => { e.stopPropagation(); deletarOS(os.numero_os); }} title="Deletar OS"><Trash2 size={16} /></button>
+                      </td>
+                    </tr>
+                  )
+                }) : (
+                  <tr><td colSpan="9" style={{textAlign: 'center', padding: '30px'}}>Nenhuma OS encontrada.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
   );
 };
-
 export default ListaOS;

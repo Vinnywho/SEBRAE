@@ -1,387 +1,506 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+﻿import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase';
-import edit from '../../assets/icons/edit.svg';
-import delet from '../../assets/icons/delet.svg';
+import { useConfig } from '../../context/ConfigContext';
+import { getDayOfWeek } from '../../utils/format';
+import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit } from 'lucide-react';
 import './OSForm.css';
 
-const VALORES_POR_LOTE = {
-  lote2: [611.04, 297.09], lote5: [841.04, 683.35], lote7: [737.46, 368.73],
-  lote8: [623.07, 316.05], lote10: [747.99, 316.05], lote11: [632.11, 204.38]
-};
-
 const OSForm = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const osEditId = searchParams.get('id');
+  const isViewMode = searchParams.get('view') === 'true';
+  const { lotes, aliquotaISS } = useConfig();
+
+  const [isLoading, setIsLoading] = useState(!!osEditId);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastEdited, setLastEdited] = useState(null);
 
   const [formData, setFormData] = useState({
     numeroOS: '', lote: '', endereco: '', adicionais: '', observacoes: '',
-    valorUnitarioTotal: '', cursoResponsavel: '', nfsE: '', valorISS: '', valorHL: '', lucroPrevisto: ''
+    nfsE: '', statusContaAzul: 'Pendente'
   });
 
-  const [detalheInput, setDetalheInput] = useState({
-    data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', meiaDiaria: ''
-  });
-  
   const [detalhes, setDetalhes] = useState([]);
-  const [valorDetalheAtual, setValorDetalheAtual] = useState('');
-  
+  const [detalheInput, setDetalheInput] = useState({
+    data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0
+  });
   const [editDetalheIndex, setEditDetalheIndex] = useState(null);
-  
+
   const [despesasResponsaveis, setDespesasResponsaveis] = useState({});
-  const [responsavelSelecionado, setResponsavelSelecionado] = useState('');
+  const [activeRespTab, setActiveRespTab] = useState('');
 
+  // Fetch initial data
   useEffect(() => {
-    if (osEditId) {
-      const fetchOSData = async () => {
-        try {
-          const { data: osData, error: osError } = await supabase
-            .from('ordens_servico')
-            .select('*')
-            .eq('numero_os', osEditId)
-            .single();
-          if (osError) throw osError;
+    if (!osEditId) return;
+    const fetchOSData = async () => {
+      try {
+        const { data: osData, error: osError } = await supabase
+          .from('ordens_servico')
+          .select('*')
+          .eq('numero_os', osEditId)
+          .single();
+        if (osError) throw osError;
 
-          const { data: detalhesData, error: detalhesError } = await supabase
-            .from('os_detalhes')
-            .select('*')
-            .eq('numero_os', osEditId);
-          if (detalhesError) throw detalhesError;
+        const { data: detData } = await supabase.from('os_detalhes').select('*').eq('numero_os', osEditId);
+        const { data: respData } = await supabase.from('os_responsaveis').select('*').eq('numero_os', osEditId);
 
-          const { data: respData, error: respError } = await supabase
-            .from('os_responsaveis')
-            .select('*')
-            .eq('numero_os', osEditId);
-          if (respError) throw respError;
+        setFormData({
+          numeroOS: osData.numero_os,
+          lote: osData.lote || '',
+          endereco: osData.endereco || '',
+          adicionais: osData.adicionais || '',
+          observacoes: osData.observacoes || '',
+          nfsE: osData.nfs_e || '',
+          statusContaAzul: osData.status_conta_azul || 'Pendente'
+        });
 
-          setFormData({
-            numeroOS: osData.numero_os, lote: osData.lote || '', endereco: osData.endereco || '',
-            adicionais: osData.adicionais || '', observacoes: osData.observacoes || '',
-            valorUnitarioTotal: osData.valor_unitario_total || '', cursoResponsavel: osData.curso_responsavel || '',
-            nfsE: osData.nfs_e || '', valorISS: osData.valor_iss || '', valorHL: osData.valor_hl || '',
-            lucroPrevisto: osData.lucro_previsto || ''
-          });
-
-          const mappedDetalhes = detalhesData.map(d => ({
-            data: d.data_servico || '', responsavel: d.responsavel_servico || '',
-            horarioGravacao: d.horario_gravacao || '', horarioSaida: d.horario_saida || '',
-            servico: d.servico || '', meiaDiaria: d.meia_diaria || '', valorUnitario: d.valor_unitario
-          }));
-          setDetalhes(mappedDetalhes);
-
-          const respDict = {};
-          respData.forEach(r => {
-            respDict[r.nome] = {
-              valorFreelance: r.valor_freelance || '', reembolsoConducao: r.reembolso_conducao || '',
-              reembolsoAlimentacao: r.reembolso_alimentacao || '', reembolsoHospedagem: r.reembolso_hospedagem || '',
-              agendamento: r.agendamento || '', statusPagamento: r.status_pagamento || '', dataPagamento: r.data_pagamento || ''
-            };
-          });
-          setDespesasResponsaveis(respDict);
-
-        } catch (error) {
-          console.error("Erro ao carregar OS para edição:", error);
-          alert("Não foi possível carregar os dados desta OS.");
+        if (osData.updated_at && osData.updated_by_email) {
+            setLastEdited({ date: osData.updated_at, by: osData.updated_by_email });
         }
-      };
-      fetchOSData();
-    }
-  }, [osEditId]);
 
+        const mappedDetalhes = (detData || []).map(d => {
+          const qtd = Number(d.quantidade_diarias) || 1;
+          const total = Number(d.valor_unitario) || 0;
+          return {
+            data: d.data_servico || '',
+            responsavel: d.responsavel_servico || '',
+            horarioGravacao: d.horario_gravacao || '',
+            horarioSaida: d.horario_saida || '',
+            servico: d.servico || '',
+            notasServico: '',
+            produtoId: 'legacy',
+            quantidadeDiarias: qtd,
+            valorUnitarioBaseLegado: total / qtd,
+            valorUnitario: total
+          };
+        });
+        setDetalhes(mappedDetalhes);
+
+        const respDict = {};
+        (respData || []).forEach(r => {
+          respDict[r.nome] = {
+            valorFreelance: r.valor_freelance || '',
+            reembolsoConducao: r.reembolso_conducao || '',
+            reembolsoAlimentacao: r.reembolso_alimentacao || '',
+            reembolsoHospedagem: r.reembolso_hospedagem || '',
+            agendamento: r.agendamento || '',
+            statusPagamento: r.status_pagamento || '',
+            dataPagamento: r.data_pagamento || ''
+          };
+        });
+        setDespesasResponsaveis(respDict);
+        if (Object.keys(respDict).length > 0) setActiveRespTab(Object.keys(respDict)[0]);
+
+      } catch (error) {
+        alert("Erro ao carregar OS");
+        navigate('/lista-os');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchOSData();
+  }, [osEditId, navigate]);
+
+  // Sync Responsáveis list with Detalhes
   useEffect(() => {
-    const somaTotal = detalhes.reduce((acc, detalhe) => acc + Number(detalhe.valorUnitario), 0);
-    setFormData(prev => ({ ...prev, valorUnitarioTotal: somaTotal }));
+    const activeResponsaveis = new Set(detalhes.map(d => d.responsavel).filter(Boolean));
+    setDespesasResponsaveis(prev => {
+      const newDict = { ...prev };
+      let changed = false;
+      activeResponsaveis.forEach(nome => {
+        if (!newDict[nome]) {
+          newDict[nome] = {
+            valorFreelance: '', reembolsoConducao: '', reembolsoAlimentacao: '',
+            reembolsoHospedagem: '', agendamento: '', statusPagamento: '', dataPagamento: ''
+          };
+          changed = true;
+        }
+      });
+      Object.keys(newDict).forEach(nome => {
+        if (!activeResponsaveis.has(nome)) {
+          delete newDict[nome];
+          changed = true;
+        }
+      });
+      return changed ? newDict : prev;
+    });
+
+    if (activeResponsaveis.size > 0 && !activeResponsaveis.has(activeRespTab)) {
+      setActiveRespTab(Array.from(activeResponsaveis)[0]);
+    } else if (activeResponsaveis.size === 0) {
+      setActiveRespTab('');
+    }
   }, [detalhes]);
 
-  useEffect(() => {
-    const issCalculado = Number(formData.valorUnitarioTotal) * 0.1633;
-    setFormData(prev => ({ ...prev, valorISS: issCalculado }));
-  }, [formData.valorUnitarioTotal]);
-
-  useEffect(() => {
-    let custoTotal = 0;
-    Object.values(despesasResponsaveis).forEach(resp => {
-      custoTotal += (Number(resp.valorFreelance) || 0) + (Number(resp.reembolsoConducao) || 0) +
-                    (Number(resp.reembolsoAlimentacao) || 0) + (Number(resp.reembolsoHospedagem) || 0);
+  // Calculated fields
+  const financeiro = useMemo(() => {
+    const faturamento = detalhes.reduce((acc, d) => acc + (Number(d.valorUnitario) || 0), 0);
+    const iss = faturamento * aliquotaISS;
+    let custoResponsaveis = 0;
+    Object.values(despesasResponsaveis).forEach(r => {
+      custoResponsaveis += (Number(r.valorFreelance) || 0) + (Number(r.reembolsoConducao) || 0) +
+                           (Number(r.reembolsoAlimentacao) || 0) + (Number(r.reembolsoHospedagem) || 0);
     });
-    setFormData(prev => ({ ...prev, cursoResponsavel: custoTotal }));
-  }, [despesasResponsaveis]);
+    const lucro = faturamento - iss - custoResponsaveis;
+    const margem = faturamento > 0 ? (lucro / faturamento) * 100 : 0;
+    return { faturamento, iss, custoResponsaveis, lucro, margem };
+  }, [detalhes, despesasResponsaveis, aliquotaISS]);
 
-  useEffect(() => {
-    const despesas = Number(formData.cursoResponsavel) + Number(formData.valorISS) + Number(formData.valorHL);
-    const lucro = Number(formData.valorUnitarioTotal) - despesas;
-    setFormData(prev => ({ ...prev, lucroPrevisto: lucro }));
-  }, [formData.cursoResponsavel, formData.valorISS, formData.valorHL, formData.valorUnitarioTotal]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    if (name === 'lote') setValorDetalheAtual('');
-  };
-
-  const handleDetalheInputChange = (e) => {
-    const { name, value } = e.target;
-    setDetalheInput({ ...detalheInput, [name]: value });
-  };
-
-  const handleDespesaResponsavelChange = (e) => {
-    const { name, value } = e.target;
-    if (!responsavelSelecionado) return;
+  const handleInput = e => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleDetInput = e => setDetalheInput({ ...detalheInput, [e.target.name]: e.target.value });
+  const handleRespInput = e => {
+    if (!activeRespTab) return;
     setDespesasResponsaveis(prev => ({
       ...prev,
-      [responsavelSelecionado]: {
-        ...prev[responsavelSelecionado],
-        [name]: value
-      }
+      [activeRespTab]: { ...prev[activeRespTab], [e.target.name]: e.target.value }
     }));
   };
 
-  // Funções de Ação dos Detalhes
-  const handleEditDetalhe = (index) => {
-    const det = detalhes[index];
-    setDetalheInput({
-      data: det.data || '',
-      responsavel: det.responsavel || '',
-      horarioGravacao: det.horarioGravacao || '',
-      horarioSaida: det.horarioSaida || '',
-      servico: det.servico || '',
-      meiaDiaria: det.meiaDiaria || ''
-    });
-    setValorDetalheAtual(det.valorUnitario);
-    setEditDetalheIndex(index);
-  };
+  const addOrUpdateDetalhe = () => {
+    if (!formData.lote || !detalheInput.responsavel || !detalheInput.produtoId) return alert("Preencha o Lote, o Responsável e selecione o Produto.");
+    
+    let baseValue = 0;
+    let nomeServicoFinal = detalheInput.servico;
 
-  const handleDeleteDetalhe = (index) => {
-    setDetalhes(prev => prev.filter((_, i) => i !== index));
-    if (editDetalheIndex === index) {
-      setEditDetalheIndex(null);
-      setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', meiaDiaria: '' });
-      setValorDetalheAtual('');
-    }
-  };
-
-  const handleAddDetalhe = () => {
-    if (!formData.lote || !valorDetalheAtual || !detalheInput.responsavel) {
-      alert("Preencha o Lote, o Responsável no detalhe e selecione o Valor Unitário.");
-      return;
+    if (detalheInput.produtoId !== 'legacy') {
+      const p = lotes[formData.lote]?.produtos?.find(x => x.id === detalheInput.produtoId);
+      if (p) {
+         baseValue = p.valor;
+         nomeServicoFinal = `[${p.nome} - ${p.unidade}]` + (detalheInput.notasServico ? ` ${detalheInput.notasServico}` : '');
+      }
+    } else {
+      baseValue = detalheInput.valorUnitarioBaseLegado || 0;
+      nomeServicoFinal = detalheInput.notasServico ? `${detalheInput.servico} | ${detalheInput.notasServico}` : detalheInput.servico;
     }
 
-    const novoDetalhe = { ...detalheInput, valorUnitario: Number(valorDetalheAtual) };
+    const novoDetalhe = { 
+      ...detalheInput, 
+      servico: nomeServicoFinal,
+      valorUnitario: baseValue * Number(detalheInput.quantidadeDiarias)
+    };
 
     if (editDetalheIndex !== null) {
-      // Atualiza o detalhe existente
       setDetalhes(prev => {
-        const atualizados = [...prev];
-        atualizados[editDetalheIndex] = novoDetalhe;
-        return atualizados;
+        const arr = [...prev];
+        arr[editDetalheIndex] = novoDetalhe;
+        return arr;
       });
       setEditDetalheIndex(null);
     } else {
-      // Adiciona um detalhe novo
       setDetalhes(prev => [...prev, novoDetalhe]);
     }
-
-    if (!despesasResponsaveis[detalheInput.responsavel]) {
-      setDespesasResponsaveis(prev => ({
-        ...prev,
-        [detalheInput.responsavel]: {
-          valorFreelance: '', reembolsoConducao: '', reembolsoAlimentacao: '', reembolsoHospedagem: '',
-          agendamento: '', statusPagamento: '', dataPagamento: ''
-        }
-      }));
-      if (!responsavelSelecionado) setResponsavelSelecionado(detalheInput.responsavel);
-    }
-
-    setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', meiaDiaria: '' });
-    setValorDetalheAtual(''); 
+    setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
   };
 
-  const handleSubmit = async (e) => {
+  const editDetalhe = (idx) => {
+    if (isViewMode) return;
+    setDetalheInput(detalhes[idx]);
+    setEditDetalheIndex(idx);
+  };
+  const delDetalhe = (idx) => {
+    if (isViewMode) return;
+    setDetalhes(prev => prev.filter((_, i) => i !== idx));
+    if (editDetalheIndex === idx) {
+      setEditDetalheIndex(null);
+      setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
+    }
+  };
+
+  const salvar = async (e) => {
     e.preventDefault();
-    if (!formData.numeroOS) {
-      alert("O 'Número da OS' é obrigatório.");
-      return;
-    }
-
+    if (!formData.numeroOS) return alert("Número da OS é obrigatório.");
+    setIsSaving(true);
     try {
-      const osPayload = {
+      const payloadOs = {
         numero_os: formData.numeroOS, lote: formData.lote, endereco: formData.endereco,
-        adicionais: formData.adicionais, observacoes: formData.observacoes,
-        valor_unitario_total: formData.valorUnitarioTotal || null, curso_responsavel: formData.cursoResponsavel || null,
-        nfs_e: formData.nfsE, valor_iss: formData.valorISS || null, valor_hl: Number(formData.valorHL) || null,
-        lucro_previsto: formData.lucroPrevisto || null
+        adicionais: formData.adicionais, observacoes: formData.observacoes, nfs_e: formData.nfsE,
+        status_conta_azul: formData.statusContaAzul,
+        valor_unitario_total: financeiro.faturamento, curso_responsavel: financeiro.custoResponsaveis,
+        valor_iss: financeiro.iss, lucro_previsto: financeiro.lucro
       };
+      const payloadDet = detalhes.map(d => ({
+        valor_unitario: d.valorUnitario, data_servico: d.data, responsavel_servico: d.responsavel,
+        horario_gravacao: d.horarioGravacao, horario_saida: d.horarioSaida, servico: d.servico, quantidade_diarias: Number(d.quantidadeDiarias)
+      }));
+      const payloadResp = Object.entries(despesasResponsaveis).map(([nome, r]) => ({
+        nome, valor_freelance: r.valorFreelance, reembolso_conducao: r.reembolsoConducao,
+        reembolso_alimentacao: r.reembolsoAlimentacao, reembolso_hospedagem: r.reembolsoHospedagem,
+        agendamento: r.agendamento, status_pagamento: r.statusPagamento, data_pagamento: r.dataPagamento
+      }));
 
-      const { error: osError } = await supabase.from('ordens_servico').upsert([osPayload]);
-      if (osError) throw osError;
-
-      if (detalhes.length > 0) {
-        const detalhesPayload = detalhes.map(det => ({
-          numero_os: formData.numeroOS, valor_unitario: det.valorUnitario, data_servico: det.data || null,
-          responsavel_servico: det.responsavel, horario_gravacao: det.horarioGravacao || null,
-          horario_saida: det.horarioSaida || null, servico: det.servico, meia_diaria: det.meiaDiaria
-        }));
-        await supabase.from('os_detalhes').delete().eq('numero_os', formData.numeroOS); 
-        const { error: detalhesError } = await supabase.from('os_detalhes').insert(detalhesPayload);
-        if (detalhesError) throw detalhesError;
+      const { error } = await supabase.rpc('salvar_os', {
+        p_os: payloadOs, p_detalhes: payloadDet, p_responsaveis: payloadResp, p_is_novo: !osEditId
+      });
+      
+      if (error) {
+        if(error.code === '23505') throw new Error("O número de OS já existe.");
+        throw error;
       }
-
-      const responsaveisNomes = Object.keys(despesasResponsaveis);
-      if (responsaveisNomes.length > 0) {
-        const responsaveisPayload = responsaveisNomes.map(nome => {
-          const resp = despesasResponsaveis[nome];
-          return {
-            numero_os: formData.numeroOS, nome: nome,
-            valor_freelance: Number(resp.valorFreelance) || null, reembolso_conducao: Number(resp.reembolsoConducao) || null,
-            reembolso_alimentacao: Number(resp.reembolsoAlimentacao) || null, reembolso_hospedagem: Number(resp.reembolsoHospedagem) || null,
-            agendamento: resp.agendamento || null, status_pagamento: resp.statusPagamento, data_pagamento: resp.dataPagamento || null
-          };
-        });
-        await supabase.from('os_responsaveis').delete().eq('numero_os', formData.numeroOS);
-        const { error: respError } = await supabase.from('os_responsaveis').insert(responsaveisPayload);
-        if (respError) throw respError;
-      }
-
-      alert("Ordem de serviço salva com sucesso!");
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao salvar os dados.");
+      alert("Salvo com sucesso!");
+      if (!osEditId) navigate(`/os-form?id=${formData.numeroOS}`);
+    } catch (err) {
+      alert("Erro ao salvar: " + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const dadosResponsavelSelecionado = despesasResponsaveis[responsavelSelecionado] || {};
+  if (isLoading) return <div style={{padding: 20}}>Carregando...</div>;
+
+  const respData = despesasResponsaveis[activeRespTab] || {};
+  const produtosLoteAtual = lotes[formData.lote]?.produtos || [];
 
   return (
-    <form className="os-form" onSubmit={handleSubmit}>
-      <section>
-        <h2>Ativos {osEditId && <span style={{fontSize: '12px', color: '#888', marginLeft: '10px'}}>(Modo de Edição)</span>}</h2>
-        <div className="grid-3">
-          <div className="input-block">
-            <label>Número da OS</label>
-            <input 
-              type="text" 
-              name="numeroOS" 
-              value={formData.numeroOS} 
-              onChange={handleInputChange} 
-              readOnly={!!osEditId} 
-              style={{ opacity: osEditId ? 0.7 : 1 }}
-              title={osEditId ? "Não é possível alterar o número da OS durante a edição" : ""}
-            />
-          </div>
-          <div className="input-block">
-            <label>Lote</label>
-            <select name="lote" value={formData.lote} onChange={handleInputChange}>
-                <option value="" disabled>Selecione</option>
-                <option value="lote2">Lote 2</option><option value="lote5">Lote 5</option>
-                <option value="lote7">Lote 7</option><option value="lote8">Lote 8</option>
-                <option value="lote10">Lote 10</option><option value="lote11">Lote 11</option>
-            </select>
-          </div>
-          <div className="input-block"><label>Endereço da gravação</label><input type="text" name="endereco" value={formData.endereco} onChange={handleInputChange} /></div>
-        </div>
-        <div className="grid-2">
-          <div className="input-block"><label>Adicionais</label><textarea name="adicionais" value={formData.adicionais} onChange={handleInputChange}></textarea></div>
-          <div className="input-block"><label>Observações / Briefing</label><textarea name="observacoes" value={formData.observacoes} onChange={handleInputChange}></textarea></div>
-        </div>
-      </section>
+    <div className="os-form-layout">
+      <div className="os-form-main">
+        <div className="form-header-title">
+          <button className="btn-icon-back" onClick={() => navigate('/lista-os')}><ArrowLeft size={20}/></button>
+          <h2>{isViewMode ? `Visualizando OS ${osEditId}` : (osEditId ? `Editando OS ${osEditId}` : 'Nova Ordem de Serviço')}</h2>
+          
+          {isViewMode && (
+            <button className="btn-primary" style={{marginLeft: 20}} onClick={() => navigate(`/os-form?id=${osEditId}`)}>
+              <Edit size={16} /> Editar OS
+            </button>
+          )}
 
-      <section>
-        <div className="section-header">
-          <h2>Detalhes ({detalhes.length} adicionados) </h2>
-        </div>
-        
-        <div className="details-header-row">
-           <span>Data</span><span>Responsável</span><span>Horário gravação</span><span>Horário saída</span><span>Serviço</span><span>Meia diária</span><span>Valor unitário</span><span style={{textAlign: 'right'}}>Ações</span>
+          {lastEdited && (
+            <span className="badge info" style={{marginLeft: 15, fontWeight: 'normal'}}>
+              Última edição: {new Date(lastEdited.date).toLocaleString('pt-BR')} por {lastEdited.by}
+            </span>
+          )}
         </div>
 
-        {detalhes.map((det, index) => (
-          <div key={index} className="details-header-row" style={{ fontWeight: 'normal', borderBottom: '1px solid #f5f5f5', paddingBottom: '10px', marginBottom: '10px' }}>
-             <span>{det.data || '-'}</span>
-             <span>{det.responsavel}</span>
-             <span>{det.horarioGravacao || '-'}</span>
-             <span>{det.horarioSaida || '-'}</span>
-             <span>{det.servico || '-'}</span>
-             <span>{det.meiaDiaria || '-'}</span>
-             <span>R$ {det.valorUnitario}</span>
-             <span style={{textAlign: 'right'}}>
-               <button type="button" onClick={() => handleEditDetalhe(index)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', marginRight: '10px', fontSize: '14px' }}><img src={edit} alt="Editar" /></button>
-               <button type="button" onClick={() => handleDeleteDetalhe(index)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '14px' }}><img src={delet} alt="Excluir" /></button>
-             </span>
-          </div>
-        ))}
+        <form id="osform" onSubmit={salvar}>
+          {/* SEÇÃO 1: Dados Básicos */}
+          <section className="card form-section">
+            <h3 className="section-title"><span className="step-num">1</span> Dados da OS</h3>
+            <div className="grid-3">
+              <div className="input-group">
+                <label>Número da OS *</label>
+                <input required type="text" name="numeroOS" value={formData.numeroOS} onChange={handleInput} readOnly={!!osEditId} className={osEditId ? 'readonly' : ''} disabled={isViewMode} />
+              </div>
+              <div className="input-group">
+                <label>Lote *</label>
+                <select required name="lote" value={formData.lote} onChange={handleInput} disabled={isViewMode}>
+                  <option value="">Selecione um lote...</option>
+                  {Object.entries(lotes).map(([cod, l]) => l.ativo && <option key={cod} value={cod}>{l.nome}</option>)}
+                </select>
+              </div>
+              <div className="input-group">
+                <label>Endereço da gravação</label>
+                <input type="text" name="endereco" value={formData.endereco} onChange={handleInput} disabled={isViewMode} />
+              </div>
+            </div>
+            <div className="grid-2 mt-15">
+              <div className="input-group">
+                <label>Adicionais</label>
+                <textarea name="adicionais" value={formData.adicionais} onChange={handleInput} rows="3" disabled={isViewMode}/>
+              </div>
+              <div className="input-group">
+                <label>Observações / Briefing</label>
+                <textarea name="observacoes" value={formData.observacoes} onChange={handleInput} rows="3" disabled={isViewMode}/>
+              </div>
+            </div>
+          </section>
 
-        <div className="grid-4" style={{ marginTop: '30px' }}>
-          <div className="input-block"><label>Data</label><input type="date" name="data" value={detalheInput.data} onChange={handleDetalheInputChange} /></div>
-          <div className="input-block"><label>Horário gravação</label><input type="time" name="horarioGravacao" value={detalheInput.horarioGravacao} onChange={handleDetalheInputChange} /></div>
-          <div className="input-block"><label>Horário Saída</label><input type="time" name="horarioSaida" value={detalheInput.horarioSaida} onChange={handleDetalheInputChange} /></div>
-        </div>
-        <div className="grid-2">
-           <div className="input-block"><label>Responsável</label><input type="text" name="responsavel" value={detalheInput.responsavel} onChange={handleDetalheInputChange} placeholder="Nome do profissional" /></div>
-           <div className="input-block"><label>Serviço</label><input type="text" name="servico" value={detalheInput.servico} onChange={handleDetalheInputChange} /></div>
-        </div>
-        <div className="grid-3 align-end">
-           <div className="input-block"><label>Meia diária</label><input type="text" name="meiaDiaria" value={detalheInput.meiaDiaria} onChange={handleDetalheInputChange} /></div>
-           <div className="input-block">
-             <label>Valor Unitário</label>
-             <select value={valorDetalheAtual} onChange={(e) => setValorDetalheAtual(e.target.value)} disabled={!formData.lote}>
-               <option value="" disabled>{formData.lote ? "Selecione o valor" : "Selecione o Lote antes"}</option>
-               {formData.lote && VALORES_POR_LOTE[formData.lote].map((valor, index) => (
-                 <option key={index} value={valor}>R$ {valor}</option>
-               ))}
-             </select>
-           </div>
-           <button type="button" className="btn-blue" onClick={handleAddDetalhe}>
-             {editDetalheIndex !== null ? "Atualizar detalhe" : "Adicionar detalhes"}
-           </button>
-        </div>
-      </section>
+          {/* SEÇÃO 2: Detalhes */}
+          <section className="card form-section">
+            <h3 className="section-title"><span className="step-num">2</span> Detalhes & Valores Unitários</h3>
+            
+            {detalhes.length > 0 && (
+              <div className="table-responsive mb-20">
+                <table className="table details-table">
+                  <thead>
+                    <tr>
+                      <th>Data</th><th>Dia Semana</th><th>Responsável</th><th>Gravação</th><th>Saída</th>
+                      <th>Qtd.</th><th>Valor (R$)</th>
+                      {!isViewMode && <th style={{textAlign:'right'}}>Ações</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detalhes.map((d, i) => (
+                      <tr key={i} className={editDetalheIndex === i ? 'editing-row' : ''}>
+                        <td style={{whiteSpace: 'nowrap'}}>{d.data ? d.data.split('-').reverse().join('/') : '-'}</td>
+                        <td className="text-muted">{getDayOfWeek(d.data)}</td>
+                        <td className="fw-bold">{d.responsavel}<br/><span style={{fontWeight:'normal', fontSize:12, color:'#6b7280'}}>{d.servico}</span></td>
+                        <td>{d.horarioGravacao||'-'}</td><td>{d.horarioSaida||'-'}</td>
+                        <td><span className="badge info">{d.quantidadeDiarias}</span></td>
+                        <td>R$ {Number(d.valorUnitario).toFixed(2).replace('.',',')}</td>
+                        {!isViewMode && (
+                          <td style={{textAlign:'right'}}>
+                            <button type="button" className="action-btn" onClick={() => editDetalhe(i)}><Edit2 size={16}/></button>
+                            <button type="button" className="action-btn danger" onClick={() => delDetalhe(i)}><Trash2 size={16}/></button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
-      <section>
-        <h2>Responsável</h2>
-        <div className="input-block full-width">
-          <select value={responsavelSelecionado} onChange={(e) => setResponsavelSelecionado(e.target.value)}>
-            <option value="" disabled>Selecione um responsável adicionado...</option>
-            {Object.keys(despesasResponsaveis).map((nome, i) => (
-              <option key={i} value={nome}>{nome}</option>
-            ))}
-          </select>
-        </div>
-        <div className="grid-4">
-          <div className="input-block"><label>Valor do freelance</label><input type="number" step="any" name="valorFreelance" value={dadosResponsavelSelecionado.valorFreelance || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado} /></div>
-          <div className="input-block"><label>Reembolso condução</label><input type="number" step="any" name="reembolsoConducao" value={dadosResponsavelSelecionado.reembolsoConducao || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado} /></div>
-          <div className="input-block"><label>Reembolso alimentação</label><input type="number" step="any" name="reembolsoAlimentacao" value={dadosResponsavelSelecionado.reembolsoAlimentacao || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado} /></div>
-          <div className="input-block"><label>Reembolso hospedagem</label><input type="number" step="any" name="reembolsoHospedagem" value={dadosResponsavelSelecionado.reembolsoHospedagem || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado} /></div>
-        </div>
-        <div className="grid-3">
-           <div className="input-block"><label>Agendamento</label><input type="date" name="agendamento" value={dadosResponsavelSelecionado.agendamento || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado} /></div>
-           <div className="input-block"><label>Status do pagamento</label><select className={`payment-status-select status-${(dadosResponsavelSelecionado.statusPagamento || 'empty').toLowerCase()}`} name="statusPagamento" value={dadosResponsavelSelecionado.statusPagamento || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado}><option value="">Selecione</option><option value="Pago">Pago</option><option value="Pendente">Pendente</option></select></div>
-           <div className="input-block"><label>Data do pagamento</label><input type="date" name="dataPagamento" value={dadosResponsavelSelecionado.dataPagamento || ''} onChange={handleDespesaResponsavelChange} disabled={!responsavelSelecionado} /></div>
-        </div>
-      </section>
+            {!isViewMode && (
+              <div className="form-panel">
+                <div className="grid-3 mb-15">
+                  <div className="input-group">
+                    <label>Data</label><input type="date" name="data" value={detalheInput.data} onChange={handleDetInput}/>
+                  </div>
+                  <div className="input-group">
+                    <label>Horário Entrada</label><input type="time" name="horarioGravacao" value={detalheInput.horarioGravacao} onChange={handleDetInput}/>
+                  </div>
+                  <div className="input-group">
+                    <label>Horário Saída</label><input type="time" name="horarioSaida" value={detalheInput.horarioSaida} onChange={handleDetInput}/>
+                  </div>
+                </div>
+                
+                <div className="grid-3 mb-15">
+                  <div className="input-group">
+                    <label>Nome do Responsável *</label><input type="text" name="responsavel" value={detalheInput.responsavel} onChange={handleDetInput} placeholder="Ex: João Silva"/>
+                  </div>
+                  
+                  <div className="input-group" style={{gridColumn: 'span 2'}}>
+                    <label>Produto / Serviço do Lote *</label>
+                    <select 
+                      name="produtoId" 
+                      value={detalheInput.produtoId} 
+                      onChange={handleDetInput}
+                      disabled={!formData.lote}
+                      style={{background: !formData.lote ? '#f3f4f6' : 'white'}}
+                    >
+                      <option value="">{formData.lote ? 'Selecione a tabela de preços...' : 'Selecione um Lote no Passo 1 primeiro'}</option>
+                      {produtosLoteAtual.map(p => (
+                        <option key={p.id} value={p.id}>{p.nome} - {p.unidade} (R$ {p.valor.toFixed(2).replace('.',',')})</option>
+                      ))}
+                      {detalheInput.produtoId === 'legacy' && (
+                        <option value="legacy">Item Antigo (Manter valor pré-calculado)</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="grid-3 mb-15">
+                  <div className="input-group">
+                    <label>Quantidade (Diárias/Horas) *</label>
+                    <input type="number" step="any" min="0" name="quantidadeDiarias" value={detalheInput.quantidadeDiarias} onChange={handleDetInput} />
+                  </div>
+                  <div className="input-group" style={{gridColumn: 'span 2'}}>
+                    <label>Notas adicionais sobre o serviço (Opcional)</label>
+                    <textarea name="notasServico" value={detalheInput.notasServico} onChange={handleDetInput} placeholder="Ex: Câmera 1, Trilha sonora..." rows="1"/>
+                  </div>
+                </div>
+                
+                <div style={{display:'flex', justifyContent:'flex-end', gap: '10px'}}>
+                  {editDetalheIndex !== null && (
+                    <button type="button" className="btn-outline" onClick={() => {setEditDetalheIndex(null); setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 })}}>Cancelar edição</button>
+                  )}
+                  <button type="button" className="btn-primary" onClick={addOrUpdateDetalhe}>
+                    <Plus size={16}/> {editDetalheIndex !== null ? 'Atualizar Detalhe' : 'Adicionar Detalhe'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
 
-      <section>
-        <h2>Faturamentos aprovados</h2>
-        <div className="grid-3">
-          <div className="input-block"><label>Valor unitário total</label><input type="number" step="any" value={formData.valorUnitarioTotal} readOnly className="readonly-input" /></div>
-          <div className="input-block"><label>Custo responsável</label><input type="number" step="any" value={formData.cursoResponsavel} readOnly className="readonly-input" /></div>
-          <div className="input-block"><label>NFS-e</label><input type="text" name="nfsE" value={formData.nfsE} onChange={handleInputChange} /></div>
-        </div>
-      </section>
+          {/* SEÇÃO 3: Responsáveis */}
+          <section className="card form-section">
+            <h3 className="section-title"><span className="step-num">3</span> Responsáveis e Pagamentos</h3>
+            {Object.keys(despesasResponsaveis).length === 0 ? (
+              <p className="text-muted" style={{padding: '20px 0'}}>Adicione detalhes acima para incluir responsáveis.</p>
+            ) : (
+              <div className="resp-tabs-container">
+                <div className="resp-tabs">
+                  {Object.keys(despesasResponsaveis).map(nome => (
+                    <button key={nome} type="button" className={`resp-tab ${activeRespTab === nome ? 'active' : ''}`} onClick={() => setActiveRespTab(nome)}>
+                      {nome}
+                      <span className={`status-dot ${despesasResponsaveis[nome].statusPagamento === 'Pago' ? 'green' : 'red'}`}></span>
+                    </button>
+                  ))}
+                </div>
+                
+                {activeRespTab && (
+                  <div className="resp-content">
+                    <div className="grid-4 mb-15">
+                      <div className="input-group"><label>Freelance (R$)</label><input type="number" step="any" name="valorFreelance" value={respData.valorFreelance} onChange={handleRespInput} disabled={isViewMode}/></div>
+                      <div className="input-group"><label>Condução (R$)</label><input type="number" step="any" name="reembolsoConducao" value={respData.reembolsoConducao} onChange={handleRespInput} disabled={isViewMode}/></div>
+                      <div className="input-group"><label>Alimentação (R$)</label><input type="number" step="any" name="reembolsoAlimentacao" value={respData.reembolsoAlimentacao} onChange={handleRespInput} disabled={isViewMode}/></div>
+                      <div className="input-group"><label>Hospedagem (R$)</label><input type="number" step="any" name="reembolsoHospedagem" value={respData.reembolsoHospedagem} onChange={handleRespInput} disabled={isViewMode}/></div>
+                    </div>
+                    <div className="grid-3">
+                      <div className="input-group"><label>Agendamento</label><input type="date" name="agendamento" value={respData.agendamento} onChange={handleRespInput} disabled={isViewMode}/></div>
+                      <div className="input-group">
+                        <label>Status do Pagamento</label>
+                        <select name="statusPagamento" value={respData.statusPagamento} onChange={handleRespInput} className={respData.statusPagamento === 'Pago' ? 'text-success' : (respData.statusPagamento === 'Pendente' ? 'text-danger' : '')} disabled={isViewMode}>
+                          <option value="">Selecione...</option>
+                          <option value="Pendente">Pendente</option>
+                          <option value="Pago">Pago</option>
+                        </select>
+                      </div>
+                      <div className="input-group"><label>Data do Pagamento</label><input type="date" name="dataPagamento" value={respData.dataPagamento} onChange={handleRespInput} disabled={isViewMode}/></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
 
-      <section>
-        <h2>Informações de valores e Nota Fiscal</h2>
-        <div className="grid-3">
-          <div className="input-block"><label>Valor ISS (16,33%)</label><input type="number" step="any" value={formData.valorISS} readOnly className="readonly-input" /></div>
-          <div className="input-block"><label>Valor HL</label><input type="number" step="any" name="valorHL" value={formData.valorHL} onChange={handleInputChange} /></div>
-          <div className="input-block"><label>Lucro previsto</label><input type="number" step="any" value={formData.lucroPrevisto} readOnly className="readonly-input" /></div>
-        </div>
-      </section>
-
-      <div className="form-actions">
-        <button type="submit" className="btn-submit">{osEditId ? "Atualizar Ordem de Serviço" : "Salvar Ordem de Serviço"}</button>
+          {/* SEÇÃO 4: NF e Faturamento */}
+          <section className="card form-section mb-60">
+            <h3 className="section-title"><span className="step-num">4</span> Faturamento</h3>
+            <div className="grid-3">
+              <div className="input-group"><label>NFS-e</label><input type="text" name="nfsE" value={formData.nfsE} onChange={handleInput} disabled={isViewMode}/></div>
+              <div className="input-group">
+                <label>Lançado no Conta Azul?</label>
+                <div className="segmented-control">
+                  <button type="button" className={formData.statusContaAzul === 'Pendente' ? 'active warning' : ''} onClick={() => !isViewMode && setFormData({...formData, statusContaAzul: 'Pendente'})} style={{cursor: isViewMode ? 'default' : 'pointer'}}>Pendente</button>
+                  <button type="button" className={formData.statusContaAzul === 'Concluído' ? 'active success' : ''} onClick={() => !isViewMode && setFormData({...formData, statusContaAzul: 'Concluído'})} style={{cursor: isViewMode ? 'default' : 'pointer'}}>Concluído</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </form>
       </div>
-    </form>
+
+      <div className="os-form-sidebar">
+        <div className="card fixed-summary">
+          <h3>Resumo Financeiro</h3>
+          
+          <div className="summary-list">
+            <div className="summary-item"><span className="text-muted">Faturamento</span><span className="fw-bold">R$ {financeiro.faturamento.toFixed(2).replace('.',',')}</span></div>
+            <div className="summary-item"><span className="text-muted">Despesas Resp.</span><span>- R$ {financeiro.custoResponsaveis.toFixed(2).replace('.',',')}</span></div>
+            <div className="summary-item"><span className="text-muted">Imposto (ISS)</span><span>- R$ {financeiro.iss.toFixed(2).replace('.',',')}</span></div>
+            
+            <div className="summary-divider"></div>
+            
+            <div className={`summary-total ${financeiro.lucro >= 0 ? 'positive' : 'negative'}`}>
+              <span>Lucro Previsto</span>
+              <span style={{fontSize:'22px', fontWeight:'bold'}}>R$ {financeiro.lucro.toFixed(2).replace('.',',')}</span>
+            </div>
+            
+            <div className="summary-item mt-10" style={{alignItems:'center'}}>
+              <span className="text-muted">Margem de Lucro</span>
+              <span className={`badge ${financeiro.margem >= 20 ? 'success' : (financeiro.margem > 0 ? 'warning' : 'danger')}`}>{financeiro.margem.toFixed(1)}%</span>
+            </div>
+          </div>
+
+          {!isViewMode && (
+            <div className="form-actions mt-30">
+              <button form="osform" type="submit" className="btn-primary" style={{width: '100%', padding: '14px', fontSize: '15px'}} disabled={isSaving}>
+                <Save size={20}/> {isSaving ? 'Salvando...' : 'Salvar Ordem de Serviço'}
+              </button>
+            </div>
+          )}
+          {isViewMode && (
+            <div className="form-actions mt-30">
+              <button type="button" className="btn-outline" style={{width: '100%', padding: '14px', fontSize: '15px'}} onClick={() => navigate('/lista-os')}>
+                <ArrowLeft size={20}/> Voltar para Lista
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
-
 export default OSForm;

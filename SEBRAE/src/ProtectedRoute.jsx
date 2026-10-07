@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from "./supabase";
 
 function ProtectedRoute({ children }) {
   const [loading, setLoading] = useState(true);
   const [authenticated, setAuthenticated] = useState(false);
-  const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
 
   useEffect(() => {
     const checkSession = async () => {

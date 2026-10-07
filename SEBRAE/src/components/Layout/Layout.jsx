@@ -1,137 +1,87 @@
-import { useState, useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
-import home from "../../assets/icons/home.svg";
-import listOS from "../../assets/icons/listOS.svg";
-import search from "../../assets/icons/search.svg";
+﻿import { useState, useEffect } from "react";
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { supabase } from "../../supabase";
 import logos from "../../assets/icons/logos.svg";
-import calendar from "../../assets/icons/calendar.svg";
-import { createClient } from "@supabase/supabase-js";
+import { Home, FileText, CalendarDays, Settings, LogOut, Menu, Plus } from "lucide-react";
 import "./Layout.css";
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
   const [userEmail, setUserEmail] = useState("");
-
   const navigate = useNavigate();
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY,
-  );
 
   useEffect(() => {
     const getLoggedUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         setUserEmail(user.email);
-      } else if (error) {
-        console.error("Erro ao buscar usuário logado:", error.message);
       }
     };
-
     getLoggedUser();
   }, []);
 
   const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      navigate("/");
-    } catch (error) {
-      console.error(error);
-      alert("Erro ao fazer logout.");
-    }
+    await supabase.auth.signOut();
+    navigate("/");
   };
 
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const handleSearch = () => {
-    if (searchTerm.trim()) {
-      navigate(`/os-form?id=${searchTerm.trim()}`);
-      setSearchTerm("");
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
+  const navItems = [
+    { to: "/dashboard", icon: <Home size={20} />, label: "Dashboard" },
+    { to: "/lista-os", icon: <FileText size={20} />, label: "Ordens de Serviço" },
+    { to: "/pagamentos", icon: <CalendarDays size={20} />, label: "Pagamentos" },
+    { to: "/configuracoes", icon: <Settings size={20} />, label: "Configurações" }
+  ];
 
   return (
     <div className="layout-wrapper">
-      {/* NOVA LINHA: Fundo escuro clicável que aparece no mobile para fechar a sidebar */}
-      {isSidebarOpen && (
-        <div className="sidebar-mobile-overlay" onClick={toggleSidebar}></div>
-      )}
+      {isSidebarOpen && <div className="sidebar-mobile-overlay" onClick={() => setIsSidebarOpen(false)}></div>}
 
       <aside className={`sidebar ${!isSidebarOpen ? "closed" : ""}`}>
         <div className="sidebar-logos">
-          <img src={logos} alt="logos" className="logos" />
+          <img src={logos} alt="Sebrae" className="logos" />
         </div>
+        
         <div className="sidebar-menu">
           {isSidebarOpen && <h3 className="menu-title">Acesso rápido</h3>}
 
-          <div className="search-bar">
-            <span onClick={handleSearch} style={{ cursor: "pointer" }}>
-              <img src={search} alt="Pesquisar" className="search-icon" />
-            </span>
-
-            {isSidebarOpen && (
-              <input
-                type="text"
-                placeholder="Pesquisar OS..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-            )}
-          </div>
-
-          <nav>
-            <a href="/dashboard" className="nav-item">
-              <span>
-                <img src={home} alt="Home" className="nav-icon" />
-              </span>{" "}
-              {isSidebarOpen && "Home"}
-            </a>
-            <a href="/lista-os" className="nav-item">
-              <span>
-                <img src={listOS} alt="Lista de OS" className="nav-icon" />
-              </span>{" "}
-              {isSidebarOpen && "Lista de OS"}
-            </a>
-            <a href="/pagamentos" className="nav-item">
-              <span>
-                <img src={calendar} alt="Pagamentos" className="nav-icon" />
-              </span>
-              {isSidebarOpen && "Pagamentos"}
-            </a>
+          <nav style={{marginTop: '15px'}}>
+            {navItems.map(item => (
+              <NavLink 
+                key={item.to} 
+                to={item.to} 
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)}
+              >
+                {item.icon}
+                {isSidebarOpen && <span>{item.label}</span>}
+              </NavLink>
+            ))}
           </nav>
         </div>
+
         <div className="sidebar-footer">
-          <a
-            onClick={handleLogout}
-            className="logout-btn"
-            style={{ cursor: "pointer" }}
-          >
-            <span>⏻</span> {isSidebarOpen && "Logout"}
+          <a onClick={handleLogout} className="logout-btn">
+            <LogOut size={20} />
+            {isSidebarOpen && <span>Sair do sistema</span>}
           </a>
         </div>
       </aside>
 
       <main className="main-content">
         <header className="top-header">
-          <button className="hamburger-menu" onClick={toggleSidebar}>
-            ☰
-          </button>
-          <div className="user-profile">
-            <span className="user-name">{userEmail || "Carregando..."}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <button className="hamburger-menu" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+              <Menu size={24} />
+            </button>
+          </div>
+          
+          <div className="header-actions">
+            <button className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px' }} onClick={() => navigate('/os-form')}>
+              <Plus size={16} /> Nova OS
+            </button>
+            <div className="user-profile">
+              <div className="avatar">{userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}</div>
+            </div>
           </div>
         </header>
         <div className="page-content">

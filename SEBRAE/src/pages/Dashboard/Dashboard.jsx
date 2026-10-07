@@ -1,221 +1,301 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from "react";
+import { supabase } from "../../supabase";
 import { useNavigate } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { supabase } from '../../supabase';
-import './Dashboard.css';
+import { TrendingUp, DollarSign, Activity, FileText, CheckCircle, X, ExternalLink, ArrowRight, Users } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import "./Dashboard.css";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalFaturado: 0,
+    totalCustos: 0,
+    lucroTotal: 0,
+    totalOS: 0,
+    contaAzulPendentes: 0,
+    pagamentosPendentes: 0,
+    margemMedia: 0
+  });
   
-  const [totalOS, setTotalOS] = useState(0);
-  const [osPendentes, setOsPendentes] = useState([]);
-  const [osSemNfse, setOsSemNfse] = useState([]);
+  const [pendingOS, setPendingOS] = useState([]);
+  const [pendingPayments, setPendingPayments] = useState([]);
   
-  // Novos estados para os gráficos
+  const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showPaymentsModal, setShowPaymentsModal] = useState(false);
+  
   const [chartData, setChartData] = useState([]);
-  const [pendingResponsibles, setPendingResponsibles] = useState([]);
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalList, setModalList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const loadDashboard = async () => {
       try {
-        // Requisição expandida para trazer lucro, data de criação e valores financeiros dos responsáveis
-        const { data, error } = await supabase
-          .from('ordens_servico')
-          .select(`
-            numero_os, 
-            nfs_e, 
-            lucro_previsto, 
-            created_at, 
-            os_responsaveis(nome, status_pagamento, valor_freelance, reembolso_conducao, reembolso_alimentacao, reembolso_hospedagem)
-          `);
-
+        const { data, error } = await supabase.from("ordens_servico").select("*, os_responsaveis(*)");
         if (error) throw error;
-
-        if (data) {
-          setTotalOS(data.length);
-
-          // 1. Filtros para os Cards Superiores
-          const pendentes = data.filter(os => 
-            os.os_responsaveis && os.os_responsaveis.some(resp => resp.status_pagamento === 'Pendente')
-          );
-          setOsPendentes(pendentes);
-
-          const semNfse = data.filter(os => !os.nfs_e || os.nfs_e.trim() === '');
-          setOsSemNfse(semNfse);
-
-          // 2. Processamento do Gráfico de Linha (Últimas 7 OS por Lucro Previsto)
-          const sortedData = [...data].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-          const lastOS = sortedData.slice(-7); // Pega as últimas 7
-          
-          const mappedChartData = lastOS.map(os => ({
-            name: os.numero_os,
-            Lucro: Number(os.lucro_previsto || 0)
-          }));
-          setChartData(mappedChartData);
-
-          // 3. Processamento do Gráfico Lateral (Soma de Pagamentos Pendentes por Responsável)
-          const pendingTotals = {};
-          
+        
+        let fat = 0, custo = 0, lucro = 0;
+        const pendentesCA = [];
+        const pendentesPag = [];
+        
+        // Setup Chart Array for current month
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        
+        const dailyProfit = Array.from({length: daysInMonth}, (_, i) => ({
+          dia: String(i + 1).padStart(2, '0'),
+          lucro: 0
+        }));
+        
+        if (data && data.length > 0) {
           data.forEach(os => {
-            if (os.os_responsaveis) {
-              os.os_responsaveis.forEach(resp => {
-                if (resp.status_pagamento === 'Pendente') {
-                  // Precisão absoluta na soma das despesas pendentes
-                  const totalVal = (Number(resp.valor_freelance) || 0) +
-                                   (Number(resp.reembolso_conducao) || 0) +
-                                   (Number(resp.reembolso_alimentacao) || 0) +
-                                   (Number(resp.reembolso_hospedagem) || 0);
-                  
-                  if (pendingTotals[resp.nome]) {
-                    pendingTotals[resp.nome] += totalVal;
-                  } else {
-                    pendingTotals[resp.nome] = totalVal;
-                  }
+            fat += Number(os.valor_unitario_total || 0);
+            custo += Number(os.curso_responsavel || 0) + Number(os.valor_iss || 0);
+            lucro += Number(os.lucro_previsto || 0);
+            
+            if (os.status_conta_azul !== 'Concluído') pendentesCA.push(os);
+
+            if (os.os_responsaveis && os.os_responsaveis.length > 0) {
+              os.os_responsaveis.forEach(r => {
+                if (r.status_pagamento !== 'Pago') {
+                  const totalPg = (Number(r.valor_freelance)||0) + (Number(r.reembolso_conducao)||0) + 
+                                  (Number(r.reembolso_alimentacao)||0) + (Number(r.reembolso_hospedagem)||0);
+                  pendentesPag.push({ ...r, numero_os: os.numero_os, total: totalPg, endereco: os.endereco });
                 }
               });
             }
-          });
 
-          // Transforma o dicionário em array, ordena do maior para o menor e pega os top 6 para caber no layout
-          const pendingArray = Object.keys(pendingTotals)
-            .map(nome => ({ nome, total: pendingTotals[nome] }))
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 6);
-            
-          setPendingResponsibles(pendingArray);
+            // Populate Chart Data
+            const osDate = new Date(os.created_at);
+            if (osDate.getMonth() === currentMonth && osDate.getFullYear() === currentYear) {
+               const day = osDate.getDate();
+               dailyProfit[day - 1].lucro += Number(os.lucro_previsto || 0);
+            }
+          });
+          
+          setStats({
+            totalFaturado: fat,
+            totalCustos: custo,
+            lucroTotal: lucro,
+            totalOS: data.length,
+            contaAzulPendentes: pendentesCA.length,
+            pagamentosPendentes: pendentesPag.length,
+            margemMedia: fat > 0 ? (lucro / fat) * 100 : 0
+          });
+          
+          setPendingOS(pendentesCA);
+          // Sort payments by OS number implicitly or just leave as is
+          setPendingPayments(pendentesPag);
+          
+          const currentDay = new Date().getDate();
+          setChartData(dailyProfit.slice(0, currentDay));
         }
-      } catch (error) {
-        console.error("Erro ao buscar dados do dashboard:", error);
+      } catch (err) {
+        console.error("Erro no Dashboard:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
-
-    fetchDashboardData();
+    loadDashboard();
   }, []);
 
-  const handleOpenModal = (title, list) => {
-    setModalTitle(title);
-    setModalList(list);
-    setIsModalOpen(true);
+  const formatMoney = (val) => `R$ ${val.toFixed(2).replace('.', ',')}`;
+  
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{background: 'white', padding: '10px 15px', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)'}}>
+          <p style={{margin: '0 0 5px 0', fontWeight: 'bold', color: '#374151'}}>Dia {label}</p>
+          <p style={{margin: 0, color: '#10b981', fontWeight: 'bold'}}>
+            Lucro: {formatMoney(payload[0].value)}
+          </p>
+        </div>
+      );
+    }
+    return null;
   };
 
-  const handleCloseModal = () => setIsModalOpen(false);
-  const handleNavigateToOS = (numero_os) => navigate(`/os-form?id=${numero_os}`);
-
-  // Encontra o valor máximo para calcular a porcentagem da barra horizontal
-  const maxPendingAmount = pendingResponsibles.length > 0 
-    ? Math.max(...pendingResponsibles.map(p => p.total)) 
-    : 1;
+  if (isLoading) return <div style={{padding: '30px'}}>Carregando dashboard...</div>;
 
   return (
     <div className="dashboard-container">
-      <div className="metrics-grid">
-        <div className="metric-card">
-          <p>Total OS</p>
-          <h3>{totalOS}</h3>
-        </div>
-        
-        <div className="metric-card clickable" onClick={() => handleOpenModal('OS Pendentes (Pagamento)', osPendentes)}>
-          <p>Pendentes</p>
-          <h3>{osPendentes.length}</h3>
-        </div>
-        
-        <div className="metric-card">
-          <p>Concluídas</p>
-          <h3>{totalOS - osPendentes.length}</h3>
-        </div>
-        
-        <div className="metric-card clickable" onClick={() => handleOpenModal('OS Sem NFS-e', osSemNfse)}>
-          <p>Sem NFS-e</p>
-          <h3>{osSemNfse.length}</h3>
-        </div>
+      <div className="dash-header">
+        <h2>Dashboard Financeiro</h2>
+        <p className="text-muted">Visão geral do desempenho das Ordens de Serviço</p>
       </div>
 
-      <div className="dashboard-body">
-        
-        <div className="chart-area">
-          <div className="chart-header">
-            <span className="active">Lucro Previsto</span>
-            <span>Últimas 7 OS cadastradas</span>
-            <span className="legend" style={{marginLeft: 'auto'}}><span style={{color: '#0084ff'}}>•</span> Evolução de Lucro</span>
+      <div className="grid-3 mb-20">
+        <div className="stat-card">
+          <div className="stat-icon bg-blue"><DollarSign size={24} color="#0084ff" /></div>
+          <div className="stat-info">
+            <span className="stat-label">Total Faturado</span>
+            <span className="stat-value">{formatMoney(stats.totalFaturado)}</span>
           </div>
-          
-          <div style={{ width: '100%', height: '300px', marginTop: '30px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#888' }} tickFormatter={(value) => `R$ ${value}`} />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }} 
-                  formatter={(value) => `R$ ${Number(value).toFixed(2).replace('.', ',')}`}
-                  labelStyle={{ fontWeight: 'bold', color: '#333', marginBottom: '5px' }}
-                />
-                <Line type="monotone" dataKey="Lucro" stroke="#0084ff" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
+        </div>
+        
+        <div className="stat-card">
+          <div className="stat-icon bg-orange"><Activity size={24} color="#f59e0b" /></div>
+          <div className="stat-info">
+            <span className="stat-label">Custos Totais (Equipe + Impostos)</span>
+            <span className="stat-value">{formatMoney(stats.totalCustos)}</span>
           </div>
         </div>
 
-        <div className="traffic-area">
-          <h4>Pagamentos Pendentes</h4>
-          
-          {pendingResponsibles.length === 0 ? (
-            <p style={{fontSize: '12px', color: '#888', marginTop: '20px'}}>Nenhum pagamento pendente no momento.</p>
-          ) : (
-            pendingResponsibles.map((resp, idx) => {
-              const percentage = (resp.total / maxPendingAmount) * 100;
-              
-              return (
-                <div className="traffic-item" key={idx}>
-                  <span title={resp.nome} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px' }}>
-                    {resp.nome}
-                  </span> 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '10px', color: '#888', fontWeight: 'bold' }}>
-                      R$ {resp.total.toFixed(2).replace('.', ',')}
-                    </span>
-                    <div style={{ width: '80px', height: '5px', background: '#eee', borderRadius: '3px', overflow: 'hidden' }}>
-                      {/* A largura da barra azul muda dinamicamente de acordo com a porcentagem calculada */}
-                      <div style={{ width: `${percentage}%`, height: '100%', background: '#0084ff' }}></div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+        <div className="stat-card">
+          <div className="stat-icon bg-green"><TrendingUp size={24} color="#10b981" /></div>
+          <div className="stat-info">
+            <span className="stat-label">Lucro Previsto Total</span>
+            <span className="stat-value text-success">{formatMoney(stats.lucroTotal)}</span>
+          </div>
         </div>
-
       </div>
 
-      {isModalOpen && (
-        <div className="modal-overlay" onClick={handleCloseModal}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+        <div className="stat-card minimal">
+          <div className="stat-info">
+            <span className="stat-label">Total de OS</span>
+            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+              <FileText size={20} className="text-muted"/>
+              <span className="stat-value">{stats.totalOS}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card minimal clickable-card" onClick={() => setShowPendingModal(true)}>
+          <div className="stat-info">
+            <span className="stat-label" style={{display:'flex', justifyContent:'space-between'}}>
+              OSs s/ Conta Azul <ArrowRight size={14} color="#f59e0b"/>
+            </span>
+            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+              <CheckCircle size={20} color={stats.contaAzulPendentes > 0 ? "#f59e0b" : "#10b981"}/>
+              <span className="stat-value" style={{color: stats.contaAzulPendentes > 0 ? "#f59e0b" : "#10b981"}}>
+                {stats.contaAzulPendentes}
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="stat-card minimal clickable-card" onClick={() => setShowPaymentsModal(true)}>
+          <div className="stat-info">
+            <span className="stat-label" style={{display:'flex', justifyContent:'space-between'}}>
+              Pagamentos Pendentes <ArrowRight size={14} color="#ef4444"/>
+            </span>
+            <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+              <Users size={20} color={stats.pagamentosPendentes > 0 ? "#ef4444" : "#10b981"}/>
+              <span className="stat-value" style={{color: stats.pagamentosPendentes > 0 ? "#ef4444" : "#10b981"}}>
+                {stats.pagamentosPendentes}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card minimal">
+          <div className="stat-info">
+            <span className="stat-label">Margem Média</span>
+            <span className="stat-value">{stats.margemMedia.toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="chart-container">
+        <div className="chart-header">
+          <h3>Lucro Diário - Mês Atual</h3>
+          <p>Evolução do lucro previsto baseado na data de criação das OSs neste mês.</p>
+        </div>
+        <div style={{width: '100%', height: 300}}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{top: 10, right: 10, left: 0, bottom: 0}}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+              <XAxis dataKey="dia" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={(value) => `R$ ${value}`} />
+              <Tooltip content={<CustomTooltip />} cursor={{fill: '#f3f4f6'}} />
+              <Bar dataKey="lucro" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* MODAL: Conta Azul */}
+      {showPendingModal && (
+        <div className="modal-overlay" onClick={() => setShowPendingModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{modalTitle} ({modalList.length})</h3>
-              <button className="close-btn" onClick={handleCloseModal}>✕</button>
+              <h3>OSs Sem Conta Azul</h3>
+              <button className="btn-close" onClick={() => setShowPendingModal(false)}><X size={20}/></button>
             </div>
             <div className="modal-body">
-              {modalList.length === 0 ? (
-                <p className="empty-modal">Nenhuma ordem de serviço nesta categoria.</p>
-              ) : (
-                <ul className="modal-os-list">
-                  {modalList.map(os => (
-                    <li key={os.numero_os} onClick={() => handleNavigateToOS(os.numero_os)}>
-                      <span>{os.numero_os}</span>
-                      <span className="arrow-link">Ver detalhes →</span>
-                    </li>
+              {pendingOS.length > 0 ? (
+                <div className="pending-list">
+                  {pendingOS.map(os => (
+                    <div 
+                      key={os.numero_os} 
+                      className="pending-item" 
+                      onClick={() => navigate(`/os-form?id=${os.numero_os}&view=true`)} 
+                      style={{cursor: 'pointer'}}
+                      title="Clique para visualizar OS"
+                    >
+                      <div>
+                        <div className="os-number">{os.numero_os}</div>
+                        <div style={{fontSize: '13px', color: '#6b7280', marginTop: '2px'}}>{os.endereco || 'Sem endereço'}</div>
+                      </div>
+                      <ExternalLink size={18} color="#9ca3af" />
+                    </div>
                   ))}
-                </ul>
+                </div>
+              ) : (
+                <div style={{textAlign: 'center', padding: '30px 0', color: '#6b7280'}}>
+                  <CheckCircle size={40} color="#10b981" style={{marginBottom: 10}} opacity={0.5} />
+                  <p>Nenhuma OS pendente no Conta Azul!</p>
+                </div>
               )}
             </div>
           </div>
         </div>
       )}
+      
+      {/* MODAL: Pagamentos Pendentes */}
+      {showPaymentsModal && (
+        <div className="modal-overlay" onClick={() => setShowPaymentsModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Pagamentos de Equipe Pendentes</h3>
+              <button className="btn-close" onClick={() => setShowPaymentsModal(false)}><X size={20}/></button>
+            </div>
+            <div className="modal-body">
+              {pendingPayments.length > 0 ? (
+                <div className="pending-list">
+                  {pendingPayments.map((p, idx) => (
+                    <div 
+                      key={idx} 
+                      className="pending-item" 
+                      onClick={() => navigate(`/os-form?id=${p.numero_os}&view=true`)} 
+                      style={{cursor: 'pointer', borderLeft: '4px solid #ef4444'}}
+                      title="Clique para visualizar OS do pagamento"
+                    >
+                      <div style={{width: '100%'}}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: '4px'}}>
+                          <span style={{fontWeight: 600, color: '#1e293b'}}>{p.nome}</span>
+                          <span style={{fontWeight: 600, color: '#ef4444'}}>{formatMoney(p.total)}</span>
+                        </div>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                          <div className="os-number" style={{fontSize: '13px'}}>{p.numero_os}</div>
+                          {p.agendamento && <span style={{fontSize: '12px', color: '#6b7280'}}>Agendado: {p.agendamento.split('-').reverse().join('/')}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{textAlign: 'center', padding: '30px 0', color: '#6b7280'}}>
+                  <CheckCircle size={40} color="#10b981" style={{marginBottom: 10}} opacity={0.5} />
+                  <p>Nenhum pagamento pendente!</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 };
-
 export default Dashboard;
