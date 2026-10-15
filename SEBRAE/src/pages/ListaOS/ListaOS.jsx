@@ -51,11 +51,14 @@ const ListaOS = () => {
     if (!confirmed) return;
 
     try {
-      const { error } = await supabase
-        .from('ordens_servico')
-        .delete()
-        .eq('numero_os', numero_os);
-      if (error) throw error;
+      const { error: rpcError } = await supabase.rpc('excluir_os', { p_numero_os: numero_os });
+      if (rpcError) {
+        const { error } = await supabase
+          .from('ordens_servico')
+          .delete()
+          .eq('numero_os', numero_os);
+        if (error) throw error;
+      }
       setListaOS(listaOS.filter(os => os.numero_os !== numero_os));
       setSelectedOSs(prev => prev.filter(id => id !== numero_os));
       toast.success(`OS ${numero_os} excluída com sucesso!`);
@@ -66,8 +69,11 @@ const ListaOS = () => {
 
   // Filtros aplicados em memória
   const filteredOS = listaOS.filter(os => {
+    const nomeOS = os.nome_os || os.endereco || '';
+    const cidade = os.cidade || '';
     const matchesSearch = os.numero_os.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (os.endereco && os.endereco.toLowerCase().includes(searchTerm.toLowerCase()));
+                          nomeOS.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          cidade.toLowerCase().includes(searchTerm.toLowerCase());
     
     let matchesDate = true;
     if (dataInicio) {
@@ -149,9 +155,9 @@ const ListaOS = () => {
       }
 
       const headers = [
-        'Número da OS', 'Lote', 'Endereço', 'Adicionais', 'Observações',
+        'Número da OS', 'Lote', 'Nome da OS', 'Cidade', 'Adicionais', 'Observações',
         'Valor unitário total', 'Custo responsável', 'NFS-e', 'Valor ISS', 'Lucro previsto',
-        'Detalhe - Nome do Responsável', 'Detalhe - Serviço', 'Detalhe - Data',
+        'Detalhe - Nome do Responsável', 'Detalhe - Serviço / Endereço', 'Detalhe - Data',
         'Detalhe - Horário Gravação', 'Detalhe - Horário Saída', 'Detalhe - Data de Pagamento', 'Detalhe - Valor Unitário'
       ];
 
@@ -160,10 +166,12 @@ const ListaOS = () => {
       filteredOS.forEach(os => {
         const detalhes = detalhesPorOs[os.numero_os] || [];
         const responsaveis = responsaveisPorOs[os.numero_os] || [];
+        const nomeOS = os.nome_os || os.endereco || '';
+        const cidade = os.cidade || '';
 
         if (detalhes.length === 0) {
           csvRows.push([
-            os.numero_os, os.lote, os.endereco, os.adicionais, os.observacoes,
+            os.numero_os, os.lote, nomeOS, cidade, os.adicionais, os.observacoes,
             os.valor_unitario_total, os.curso_responsavel, os.nfs_e, os.valor_iss, os.lucro_previsto,
             '', '', '', '', '', '', ''
           ]);
@@ -171,7 +179,7 @@ const ListaOS = () => {
           detalhes.forEach(det => {
             const resp = responsaveis.find(r => r.nome === det.responsavel_servico) || {};
             csvRows.push([
-              os.numero_os, os.lote, os.endereco, os.adicionais, os.observacoes,
+              os.numero_os, os.lote, nomeOS, cidade, os.adicionais, os.observacoes,
               os.valor_unitario_total, os.curso_responsavel, os.nfs_e, os.valor_iss, os.lucro_previsto,
               det.responsavel_servico, det.servico,
               det.data_servico ? det.data_servico.split('-').reverse().join('/') : '',
@@ -299,7 +307,8 @@ const ListaOS = () => {
                   <th>Nº OS</th>
                   <th>Criação</th>
                   <th>Lote</th>
-                  <th>Endereço</th>
+                  <th>Nome da OS</th>
+                  <th>Cidade</th>
                   <th>Faturamento</th>
                   <th>NFS-e</th>
                   <th>Conta Azul</th>
@@ -336,7 +345,8 @@ const ListaOS = () => {
                       </td>
                       <td>{new Date(os.created_at).toLocaleDateString('pt-BR')}</td>
                       <td>{os.lote || '-'}</td>
-                      <td>{os.endereco || '-'}</td>
+                      <td className="fw-medium">{os.nome_os || os.endereco || '-'}</td>
+                      <td>{os.cidade || '-'}</td>
                       <td>R$ {Number(os.valor_unitario_total || 0).toFixed(2).replace('.', ',')}</td>
                       <td>
                         {os.nfs_e ? (
@@ -357,7 +367,7 @@ const ListaOS = () => {
                     </tr>
                   )
                 }) : (
-                  <tr><td colSpan="9" style={{textAlign: 'center', padding: '30px'}}>Nenhuma OS encontrada.</td></tr>
+                  <tr><td colSpan="10" style={{textAlign: 'center', padding: '30px'}}>Nenhuma OS encontrada.</td></tr>
                 )}
               </tbody>
             </table>

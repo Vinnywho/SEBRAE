@@ -1,4 +1,4 @@
-﻿.config-container {
+.config-container {
   max-width: 1000px;
   margin: 0 auto;
 }
@@ -150,4 +150,53 @@
   font-size: 12px;
   overflow-x: auto;
   max-height: 350px;
+}
+
+.diff-badge {
+  font-size: 11px;
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.diff-table th {
+  background: #f8fafc;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+}
+
+.diff-table td {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.diff-val-old {
+  color: #dc2626;
+  background: #fef2f2;
+  text-decoration: line-through;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.diff-val-new {
+  color: #16a34a;
+  background: #f0fdf4;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
 }

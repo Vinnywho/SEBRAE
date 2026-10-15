@@ -21,7 +21,7 @@ const OSForm = () => {
   const [lastEdited, setLastEdited] = useState(null);
 
   const [formData, setFormData] = useState({
-    numeroOS: '', lote: '', endereco: '', adicionais: '', observacoes: '',
+    numeroOS: '', lote: '', nomeOS: '', cidade: '', endereco: '', adicionais: '', observacoes: '',
     nfsE: '', statusContaAzul: 'Pendente'
   });
 
@@ -52,7 +52,9 @@ const OSForm = () => {
         setFormData({
           numeroOS: osData.numero_os,
           lote: osData.lote || '',
-          endereco: osData.endereco || '',
+          nomeOS: osData.nome_os || osData.endereco || '',
+          cidade: osData.cidade || '',
+          endereco: osData.nome_os || osData.endereco || '',
           adicionais: osData.adicionais || '',
           observacoes: osData.observacoes || '',
           nfsE: osData.nfs_e || '',
@@ -227,11 +229,19 @@ const OSForm = () => {
     setIsSaving(true);
     try {
       const payloadOs = {
-        numero_os: formData.numeroOS, lote: formData.lote, endereco: formData.endereco,
-        adicionais: formData.adicionais, observacoes: formData.observacoes, nfs_e: formData.nfsE,
+        numero_os: formData.numeroOS, 
+        lote: formData.lote, 
+        nome_os: formData.nomeOS,
+        cidade: formData.cidade,
+        endereco: formData.nomeOS,
+        adicionais: formData.adicionais, 
+        observacoes: formData.observacoes, 
+        nfs_e: formData.nfsE,
         status_conta_azul: formData.statusContaAzul,
-        valor_unitario_total: financeiro.faturamento, curso_responsavel: financeiro.custoResponsaveis,
-        valor_iss: financeiro.iss, lucro_previsto: financeiro.lucro
+        valor_unitario_total: financeiro.faturamento, 
+        curso_responsavel: financeiro.custoResponsaveis,
+        valor_iss: financeiro.iss, 
+        lucro_previsto: financeiro.lucro
       };
       const payloadDet = detalhes.map(d => ({
         valor_unitario: d.valorUnitario, data_servico: d.data, responsavel_servico: d.responsavel,
@@ -314,18 +324,22 @@ const OSForm = () => {
                 </select>
               </div>
               <div className="input-group">
-                <label>Endereço da gravação</label>
-                <input type="text" name="endereco" value={formData.endereco} onChange={handleInput} disabled={isViewMode} />
+                <label>Nome da OS *</label>
+                <input required type="text" name="nomeOS" value={formData.nomeOS} onChange={handleInput} placeholder="Ex: Vídeo Sebrae Delas" disabled={isViewMode} />
               </div>
             </div>
-            <div className="grid-2 mt-15">
+            <div className="grid-3 mt-15">
+              <div className="input-group">
+                <label>Cidade</label>
+                <input type="text" name="cidade" value={formData.cidade} onChange={handleInput} placeholder="Ex: São Paulo" disabled={isViewMode} />
+              </div>
               <div className="input-group">
                 <label>Adicionais</label>
-                <textarea name="adicionais" value={formData.adicionais} onChange={handleInput} rows="3" disabled={isViewMode}/>
+                <textarea name="adicionais" value={formData.adicionais} onChange={handleInput} rows="2" disabled={isViewMode}/>
               </div>
               <div className="input-group">
                 <label>Observações / Briefing</label>
-                <textarea name="observacoes" value={formData.observacoes} onChange={handleInput} rows="3" disabled={isViewMode}/>
+                <textarea name="observacoes" value={formData.observacoes} onChange={handleInput} rows="2" disabled={isViewMode}/>
               </div>
             </div>
           </section>
@@ -411,8 +425,8 @@ const OSForm = () => {
                     <input type="number" step="any" min="0" name="quantidadeDiarias" value={detalheInput.quantidadeDiarias} onChange={handleDetInput} />
                   </div>
                   <div className="input-group span-2-responsive" style={{gridColumn: 'span 2'}}>
-                    <label>Notas adicionais sobre o serviço (Opcional)</label>
-                    <textarea name="notasServico" value={detalheInput.notasServico} onChange={handleDetInput} placeholder="Ex: Câmera 1, Trilha sonora..." rows="1"/>
+                    <label>Endereço / Minutagem (Opcional)</label>
+                    <textarea name="notasServico" value={detalheInput.notasServico} onChange={handleDetInput} placeholder="Ex: Av. Paulista, 1000 - Minutagem: 02:30" rows="1"/>
                   </div>
                 </div>
                 
@@ -558,9 +572,10 @@ const OSForm = () => {
         <div style={{ background: '#f8fafc', padding: 15, borderRadius: 6, marginBottom: 20, border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: 13 }}>
             <div><strong>Lote:</strong> {lotes[formData.lote]?.nome || formData.lote || '-'}</div>
+            <div><strong>Nome da OS:</strong> {formData.nomeOS || '-'}</div>
+            <div><strong>Cidade:</strong> {formData.cidade || 'Não informada'}</div>
             <div><strong>NFS-e:</strong> {formData.nfsE || 'Não preenchida'}</div>
             <div><strong>Conta Azul:</strong> {formData.statusContaAzul || 'Pendente'}</div>
-            <div><strong>Endereço:</strong> {formData.endereco || 'Não informado'}</div>
           </div>
           {formData.adicionais && (
             <div style={{ marginTop: 8, fontSize: 12, color: '#4b5563' }}>

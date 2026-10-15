@@ -1,14 +1,22 @@
 import { useState, useEffect } from "react";
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../supabase";
 import logos from "../../assets/icons/logos.svg";
 import { Home, FileText, CalendarDays, Settings, LogOut, Menu, Plus } from "lucide-react";
 import "./Layout.css";
 
 const Layout = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
   const [userProfile, setUserProfile] = useState({ email: '', name: '', avatar: '' });
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Fecha o menu lateral no mobile automaticamente ao mudar de rota
+  useEffect(() => {
+    if (window.innerWidth <= 768) {
+      setIsSidebarOpen(false);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     const getLoggedUser = async () => {

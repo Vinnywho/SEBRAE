@@ -1,4 +1,4 @@
-﻿.os-form-layout {
+.os-form-layout {
   display: flex;
   gap: 30px;
   max-width: 1200px;
@@ -155,39 +155,120 @@
 .summary-total.negative { background: #fee2e2; color: #991b1b; }
 
 /* REGRAS RESPONSIVAS LIMPAS - SEM BLOQUEIO DE TELA */
+/* REGRAS RESPONSIVAS LIMPAS - SEM BLOQUEIO DE TELA */
 @media (max-width: 1050px) {
   .os-form-layout {
-    flex-direction: column-reverse;
+    flex-direction: column;
+    gap: 20px;
   }
   .os-form-sidebar {
     width: 100%;
     position: static;
-    margin-bottom: 25px;
+    margin-top: 10px;
+    margin-bottom: 40px;
   }
 }
 
 @media (max-width: 768px) {
+  .os-form-main {
+    width: 100%;
+  }
+
+  .form-section {
+    padding: 16px 14px !important;
+    margin-bottom: 16px;
+    border-radius: 10px;
+  }
+
+  .section-title {
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+
   .grid-2, .grid-3, .grid-4 {
     grid-template-columns: 1fr !important;
-    gap: 15px;
+    gap: 12px !important;
   }
+
   .span-2-responsive {
     grid-column: 1 / -1 !important;
   }
+
+  .input-group label {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .input-group input, 
+  .input-group select, 
+  .input-group textarea {
+    font-size: 16px; /* Evita zoom automático no iOS */
+    padding: 10px 12px;
+    width: 100%;
+  }
+
   .form-header-title {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
   }
-  .form-header-left, .form-header-right {
+
+  .form-header-left {
     width: 100%;
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
+
+  .form-header-left h2 {
+    font-size: 18px;
+    line-height: 1.3;
+  }
+
+  .form-header-right {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
   .form-header-right button {
     flex: 1;
     justify-content: center;
+    padding: 10px 12px;
+    font-size: 13px;
   }
+
   .form-panel {
-    padding: 15px;
+    padding: 14px 10px;
+  }
+
+  .details-table {
+    min-width: 580px; /* Garante que colunas nao se esmaguem */
+  }
+
+  .details-table th, 
+  .details-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .resp-tabs {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .resp-tab {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .resp-content {
+    padding: 14px 10px;
+  }
+
+  .fixed-summary {
+    padding: 18px 14px;
   }
 }
 

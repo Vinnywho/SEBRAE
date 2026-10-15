@@ -115,6 +115,138 @@ const Configuracoes = () => {
     return `${acao} em ${ent} (#${id})`;
   };
 
+  const FIELD_LABELS = {
+    nome_os: 'Nome da OS',
+    cidade: 'Cidade',
+    lote: 'Lote',
+    endereco: 'Endereço',
+    adicionais: 'Adicionais',
+    observacoes: 'Observações',
+    valor_unitario_total: 'Valor Total',
+    curso_responsavel: 'Custo da Equipe',
+    valor_iss: 'Valor ISS',
+    lucro_previsto: 'Lucro Previsto',
+    nfs_e: 'NFS-e',
+    status_conta_azul: 'Status Conta Azul',
+    aliquota_iss: 'Alíquota ISS',
+    dias_edicao_recente: 'Dias Edição Recente',
+    nome: 'Nome do Lote',
+    ativo: 'Status do Lote'
+  };
+
+  const formatValue = (key, val) => {
+    if (val === null || val === undefined || val === '') return '(vazio)';
+    if (typeof val === 'boolean') return val ? 'Sim' : 'Não';
+    if (typeof val === 'number') {
+      if (key.includes('valor') || key.includes('curso') || key.includes('lucro') || key.includes('iss') || key.includes('adicionais')) {
+        return `R$ ${val.toFixed(2).replace('.', ',')}`;
+      }
+      if (key === 'aliquota_iss') {
+        return `${(val * 100).toFixed(2)}%`;
+      }
+      return String(val);
+    }
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  };
+
+  const calcularDiferencas = (antigo, novo) => {
+    if (!antigo && !novo) return [];
+    
+    if (!antigo && novo) {
+      return Object.keys(novo)
+        .filter(k => !['created_at', 'updated_at', 'detalhes', 'responsaveis', 'produtos'].includes(k) && novo[k] !== null && novo[k] !== '')
+        .map(k => ({
+          campo: FIELD_LABELS[k] || k,
+          chave: k,
+          antes: '-',
+          depois: formatValue(k, novo[k])
+        }));
+    }
+
+    if (antigo && !novo) {
+      return [{ campo: 'Status', chave: 'status', antes: 'Ativo', depois: 'Excluído' }];
+    }
+
+    const diffs = [];
+    const allKeys = Array.from(new Set([...Object.keys(antigo), ...Object.keys(novo)]));
+
+    for (const key of allKeys) {
+      if (['detalhes', 'responsaveis', 'produtos', 'created_at', 'updated_at', 'numero_os'].includes(key)) {
+        continue;
+      }
+
+      const valAntigo = antigo[key];
+      const valNovo = novo[key];
+
+      const isAntigoEmpty = valAntigo === null || valAntigo === undefined || valAntigo === '';
+      const isNovoEmpty = valNovo === null || valNovo === undefined || valNovo === '';
+      if (isAntigoEmpty && isNovoEmpty) continue;
+
+      const numAntigo = Number(valAntigo);
+      const numNovo = Number(valNovo);
+      if (!isNaN(numAntigo) && !isNaN(numNovo) && typeof valAntigo === 'number' && typeof valNovo === 'number') {
+        if (Math.abs(numAntigo - numNovo) < 0.001) continue;
+      } else if (String(valAntigo ?? '') === String(valNovo ?? '')) {
+        continue;
+      }
+
+      diffs.push({
+        campo: FIELD_LABELS[key] || key,
+        chave: key,
+        antes: formatValue(key, valAntigo),
+        depois: formatValue(key, valNovo)
+      });
+    }
+
+    if ('detalhes' in antigo || 'detalhes' in novo) {
+      const dAntigo = antigo.detalhes || [];
+      const dNovo = novo.detalhes || [];
+      if (JSON.stringify(dAntigo) !== JSON.stringify(dNovo)) {
+        diffs.push({
+          campo: 'Serviços da OS',
+          chave: 'detalhes',
+          antes: `${dAntigo.length} serviço(s)`,
+          depois: `${dNovo.length} serviço(s)`,
+          detalheAntigo: dAntigo,
+          detalheNovo: dNovo,
+          tipoArray: 'detalhes'
+        });
+      }
+    }
+
+    if ('responsaveis' in antigo || 'responsaveis' in novo) {
+      const rAntigo = antigo.responsaveis || [];
+      const rNovo = novo.responsaveis || [];
+      if (JSON.stringify(rAntigo) !== JSON.stringify(rNovo)) {
+        diffs.push({
+          campo: 'Equipe / Responsáveis',
+          chave: 'responsaveis',
+          antes: `${rAntigo.length} responsável(is)`,
+          depois: `${rNovo.length} responsável(is)`,
+          respAntigo: rAntigo,
+          respNovo: rNovo,
+          tipoArray: 'responsaveis'
+        });
+      }
+    }
+
+    if ('produtos' in antigo || 'produtos' in novo) {
+      const pAntigo = antigo.produtos || [];
+      const pNovo = novo.produtos || [];
+      if (JSON.stringify(pAntigo) !== JSON.stringify(pNovo)) {
+        diffs.push({
+          campo: 'Tabela de Preços',
+          chave: 'produtos',
+          antes: `${pAntigo.length} produto(s)`,
+          depois: `${pNovo.length} produto(s)`
+        });
+      }
+    }
+
+    return diffs;
+  };
+
   const openNewLote = () => {
     setEditingLoteCodigo(null);
     setLoteEditData({ 
@@ -472,6 +604,23 @@ const Configuracoes = () => {
                           <div className="log-summary-text">
                             {getAcaoResumo(log)}
                           </div>
+                          {(() => {
+                            if (log.acao === 'EDICAO') {
+                              const diffs = calcularDiferencas(log.dados_antigos, log.dados_novos);
+                              if (diffs.length === 0) return null;
+                              return (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                                  <span style={{ fontSize: '11px', color: '#64748b', alignSelf: 'center' }}>Campos alterados:</span>
+                                  {diffs.map((d, i) => (
+                                    <span key={i} className="diff-badge">
+                                      {d.campo}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                         </td>
                         <td>
                           <span className={`log-entity-tag ${log.entidade}`}>
@@ -618,42 +767,184 @@ const Configuracoes = () => {
       </div>
 
       {/* MODAL DE DETALHES DO LOG */}
-      {selectedLog && (
-        <div className="modal-overlay" onClick={() => setSelectedLog(null)}>
-          <div className="modal-content" style={{ maxWidth: 700 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Detalhes do Registro de Auditoria #{selectedLog.id}</h3>
-              <button className="btn-close" onClick={() => setSelectedLog(null)}><X size={20}/></button>
-            </div>
-            <div className="modal-body" style={{ padding: 20 }}>
-              <div style={{ marginBottom: 15, fontSize: 13 }}>
-                <div><strong>Ação:</strong> {selectedLog.acao}</div>
-                <div><strong>Entidade:</strong> {selectedLog.entidade} ({selectedLog.registro_id})</div>
-                <div><strong>Data:</strong> {formatDateTime(selectedLog.created_at)}</div>
-                <div><strong>Usuário:</strong> {selectedLog.user_email || 'Sistema'}</div>
+      {selectedLog && (() => {
+        const diffs = calcularDiferencas(selectedLog.dados_antigos, selectedLog.dados_novos);
+        const isEdicao = selectedLog.acao === 'EDICAO';
+        const isCriacao = selectedLog.acao === 'CRIACAO';
+
+        return (
+          <div className="modal-overlay" onClick={() => setSelectedLog(null)}>
+            <div className="modal-content" style={{ maxWidth: 750, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Detalhes da Auditoria #{selectedLog.id}</h3>
+                <button className="btn-close" onClick={() => setSelectedLog(null)}><X size={20}/></button>
               </div>
-
-              {selectedLog.dados_novos && (
-                <div style={{ marginBottom: 15 }}>
-                  <h5 style={{ margin: '0 0 6px 0', color: '#1e293b' }}>Dados Novos:</h5>
-                  <pre className="json-viewer">
-                    {JSON.stringify(selectedLog.dados_novos, null, 2)}
-                  </pre>
+              <div className="modal-body" style={{ padding: 20 }}>
+                <div style={{ marginBottom: 15, fontSize: 13, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div><strong>Ação:</strong> <span className={`badge ${isCriacao ? 'success' : isEdicao ? 'warning' : 'danger'}`}>{selectedLog.acao}</span></div>
+                  <div><strong>Entidade:</strong> <span className={`log-entity-tag ${selectedLog.entidade}`}>{selectedLog.entidade}</span> (#{selectedLog.registro_id})</div>
+                  <div><strong>Data/Hora:</strong> {formatDateTime(selectedLog.created_at)}</div>
+                  <div><strong>Usuário:</strong> {selectedLog.user_email || 'Sistema'}</div>
                 </div>
-              )}
 
-              {selectedLog.dados_antigos && (
-                <div>
-                  <h5 style={{ margin: '0 0 6px 0', color: '#64748b' }}>Dados Anteriores:</h5>
-                  <pre className="json-viewer" style={{ opacity: 0.85 }}>
-                    {JSON.stringify(selectedLog.dados_antigos, null, 2)}
-                  </pre>
-                </div>
-              )}
+                {/* VISUALIZAÇÃO DE DIFERENÇAS DE CAMPOS */}
+                {isEdicao && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: '#1e293b', fontSize: 15 }}>
+                      Campos Alterados ({diffs.length})
+                    </h4>
+                    {diffs.length > 0 ? (
+                      <table className="diff-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: '30%' }}>Campo</th>
+                            <th style={{ width: '35%' }}>Valor Anterior</th>
+                            <th style={{ width: '35%' }}>Novo Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {diffs.map((d, idx) => (
+                            <tr key={idx}>
+                              <td><strong>{d.campo}</strong></td>
+                              <td><span className="diff-val-old">{d.antes}</span></td>
+                              <td><span className="diff-val-new">{d.depois}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="text-muted" style={{ fontSize: 13 }}>Nenhuma alteração pontual detectada nos campos principais.</p>
+                    )}
+                  </div>
+                )}
+
+                {isCriacao && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: '#1e293b', fontSize: 15 }}>
+                      Dados Cadastrados
+                    </h4>
+                    {diffs.length > 0 ? (
+                      <table className="diff-table">
+                        <thead>
+                          <tr>
+                            <th style={{ width: '40%' }}>Campo</th>
+                            <th style={{ width: '60%' }}>Valor Inicial</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {diffs.map((d, idx) => (
+                            <tr key={idx}>
+                              <td><strong>{d.campo}</strong></td>
+                              <td><span className="diff-val-new">{d.depois}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : null}
+                  </div>
+                )}
+
+                {/* DETALHES DE ARRAYS SE HOUVER (SERVICOS / RESPONSAVEIS) */}
+                {selectedLog.dados_novos?.detalhes && selectedLog.dados_novos.detalhes.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h5 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>
+                      Serviços da OS ({selectedLog.dados_novos.detalhes.length})
+                    </h5>
+                    <div className="table-responsive" style={{ border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                      <table className="table" style={{ margin: 0, fontSize: '12px' }}>
+                        <thead style={{ background: '#f8fafc' }}>
+                          <tr>
+                            <th>Serviço</th>
+                            <th>Data</th>
+                            <th>Gravação</th>
+                            <th>Saída</th>
+                            <th>Diárias</th>
+                            <th>Valor Unit.</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedLog.dados_novos.detalhes.map((det, i) => (
+                            <tr key={i}>
+                              <td className="fw-medium">{det.servico || '-'}</td>
+                              <td>{det.data || '-'}</td>
+                              <td>{det.horario_gravacao || '-'}</td>
+                              <td>{det.horario_saida || '-'}</td>
+                              <td>{det.diarias || det.quantidade_diarias || 1}</td>
+                              <td>R$ {Number(det.valor_unitario || 0).toFixed(2).replace('.', ',')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {selectedLog.dados_novos?.responsaveis && selectedLog.dados_novos.responsaveis.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <h5 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>
+                      Equipe e Pagamentos ({selectedLog.dados_novos.responsaveis.length})
+                    </h5>
+                    <div className="table-responsive" style={{ border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                      <table className="table" style={{ margin: 0, fontSize: '12px' }}>
+                        <thead style={{ background: '#f8fafc' }}>
+                          <tr>
+                            <th>Nome</th>
+                            <th>Função</th>
+                            <th>Freelance</th>
+                            <th>Status Pagamento</th>
+                            <th>Agendamento</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedLog.dados_novos.responsaveis.map((resp, i) => (
+                            <tr key={i}>
+                              <td className="fw-medium">{resp.nome || '-'}</td>
+                              <td>{resp.funcao || '-'}</td>
+                              <td>R$ {Number(resp.valor_freelance || 0).toFixed(2).replace('.', ',')}</td>
+                              <td>
+                                <span className={`badge ${resp.status_pagamento === 'Pago' ? 'success' : resp.status_pagamento === 'Não se aplica' ? 'info' : 'warning'}`}>
+                                  {resp.status_pagamento || 'Pendente'}
+                                </span>
+                              </td>
+                              <td>{resp.data_pagamento_agendada || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* EXPANDABLE RAW JSON SNAPSHOT */}
+                <details style={{ marginTop: 20, cursor: 'pointer' }}>
+                  <summary style={{ fontSize: 13, fontWeight: 600, color: '#64748b', outline: 'none' }}>
+                    Ver Snapshots Brutos (JSON Técnico)
+                  </summary>
+                  <div style={{ marginTop: 12 }}>
+                    {selectedLog.dados_novos && (
+                      <div style={{ marginBottom: 12 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>Dados Novos:</span>
+                        <pre className="json-viewer" style={{ marginTop: 4 }}>
+                          {JSON.stringify(selectedLog.dados_novos, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    {selectedLog.dados_antigos && (
+                      <div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Dados Anteriores:</span>
+                        <pre className="json-viewer" style={{ opacity: 0.85, marginTop: 4 }}>
+                          {JSON.stringify(selectedLog.dados_antigos, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </details>
+
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* LOTE EDIT MODAL */}
       {showLoteModal && (

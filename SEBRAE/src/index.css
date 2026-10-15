@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --primary-color: #0084ff;
   --primary-hover: #006bce;
   --bg-color: #f5f6fa;
@@ -106,6 +106,10 @@ input, select, button, textarea {
 
 /* Adicionado Responsividade Global */
 @media (max-width: 768px) {
+  .card {
+    padding: 16px 14px;
+  }
+
   .grid-2, .grid-3, .grid-4 {
     grid-template-columns: 1fr !important;
   }

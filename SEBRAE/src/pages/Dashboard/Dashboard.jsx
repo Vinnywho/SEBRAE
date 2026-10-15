@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, DollarSign, Activity, FileText, CheckCircle, X, ExternalLink, ArrowRight, Users } from 'lucide-react';
@@ -59,7 +59,13 @@ const Dashboard = () => {
                 if (r.status_pagamento !== 'Pago' && r.status_pagamento !== 'Não se aplica') {
                   const totalPg = (Number(r.valor_freelance)||0) + (Number(r.reembolso_conducao)||0) + 
                                   (Number(r.reembolso_alimentacao)||0) + (Number(r.reembolso_hospedagem)||0);
-                  pendentesPag.push({ ...r, numero_os: os.numero_os, total: totalPg, endereco: os.endereco });
+                  pendentesPag.push({ 
+                    ...r, 
+                    numero_os: os.numero_os, 
+                    total: totalPg, 
+                    nome_os: os.nome_os || os.endereco, 
+                    cidade: os.cidade 
+                  });
                 }
               });
             }
@@ -234,7 +240,10 @@ const Dashboard = () => {
                     >
                       <div>
                         <div className="os-number">{os.numero_os}</div>
-                        <div style={{fontSize: '13px', color: '#6b7280', marginTop: '2px'}}>{os.endereco || 'Sem endereço'}</div>
+                        <div style={{fontSize: '13px', color: '#1e293b', marginTop: '2px', fontWeight: 500}}>
+                          {os.nome_os || os.endereco || 'Sem nome'}
+                          {os.cidade && <span style={{fontSize: '12px', color: '#6b7280', marginLeft: '6px'}}>• {os.cidade}</span>}
+                        </div>
                       </div>
                       <ExternalLink size={18} color="#9ca3af" />
                     </div>
@@ -276,7 +285,9 @@ const Dashboard = () => {
                           <span style={{fontWeight: 600, color: '#ef4444'}}>{formatMoney(p.total)}</span>
                         </div>
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                          <div className="os-number" style={{fontSize: '13px'}}>{p.numero_os}</div>
+                          <div className="os-number" style={{fontSize: '13px'}}>
+                            {p.numero_os} {p.nome_os ? `• ${p.nome_os}` : ''}
+                          </div>
                           {p.agendamento && <span style={{fontSize: '12px', color: '#6b7280'}}>Agendado: {p.agendamento.split('-').reverse().join('/')}</span>}
                         </div>
                       </div>

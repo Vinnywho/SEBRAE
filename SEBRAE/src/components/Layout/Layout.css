@@ -1,4 +1,4 @@
-﻿.layout-wrapper {
+.layout-wrapper {
   display: flex;
   height: 100vh;
   width: 100vw;
@@ -196,10 +196,24 @@ nav {
   }
   
   .top-header {
-    padding: 0 15px;
+    padding: 0 12px;
+  }
+  
+  .header-actions {
+    gap: 10px;
+  }
+
+  .header-actions .btn-primary {
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+
+  .user-name-header {
+    display: none !important;
   }
   
   .page-content {
-    padding: 15px;
+    padding: 12px;
+    overflow-x: hidden;
   }
 }
