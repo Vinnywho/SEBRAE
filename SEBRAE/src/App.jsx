@@ -8,29 +8,32 @@ import ListaResponsaveis from './pages/ListaResponsaveis/ListaResponsaveis';
 import Configuracoes from "./pages/Configuracoes/Configuracoes";
 import ProtectedRoute from "./ProtectedRoute.jsx";
 import { ConfigProvider } from "./context/ConfigContext";
+import { ToastProvider } from "./context/ToastContext";
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        
-        <Route element={
-          <ProtectedRoute>
-            <ConfigProvider>
-              <Layout />
-            </ConfigProvider>
-          </ProtectedRoute>
-        }>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/os-form" element={<OSForm />} />
-          <Route path="/lista-os" element={<ListaOS />} />
-          <Route path="/pagamentos" element={<ListaResponsaveis />} />
-          <Route path="/configuracoes" element={<Configuracoes />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-      </Routes>
-    </Router>
+    <ToastProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          
+          <Route element={
+            <ProtectedRoute>
+              <ConfigProvider>
+                <Layout />
+              </ConfigProvider>
+            </ProtectedRoute>
+          }>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/os-form" element={<OSForm />} />
+            <Route path="/lista-os" element={<ListaOS />} />
+            <Route path="/pagamentos" element={<ListaResponsaveis />} />
+            <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Route>
+        </Routes>
+      </Router>
+    </ToastProvider>
   );
 }
 

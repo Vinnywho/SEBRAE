@@ -1,9 +1,11 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase';
 import { useConfig } from '../../context/ConfigContext';
+import { useToast } from '../../context/ToastContext';
 import { getDayOfWeek } from '../../utils/format';
-import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit } from 'lucide-react';
+import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit, Printer } from 'lucide-react';
+import sebraeLogo from '../../assets/img/sebrae.svg';
 import './OSForm.css';
 
 const OSForm = () => {
@@ -12,6 +14,7 @@ const OSForm = () => {
   const osEditId = searchParams.get('id');
   const isViewMode = searchParams.get('view') === 'true';
   const { lotes, aliquotaISS } = useConfig();
+  const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(!!osEditId);
   const [isSaving, setIsSaving] = useState(false);
@@ -159,7 +162,9 @@ const OSForm = () => {
   };
 
   const addOrUpdateDetalhe = () => {
-    if (!formData.lote || !detalheInput.responsavel || !detalheInput.produtoId) return alert("Preencha o Lote, o Responsável e selecione o Produto.");
+    if (!formData.lote || !detalheInput.responsavel || !detalheInput.produtoId) {
+      return toast.warning("Preencha o Lote no Passo 1, o Responsável e selecione o Produto.");
+    }
     
     let baseValue = 0;
     let nomeServicoFinal = detalheInput.servico;
@@ -167,8 +172,8 @@ const OSForm = () => {
     if (detalheInput.produtoId !== 'legacy') {
       const p = lotes[formData.lote]?.produtos?.find(x => x.id === detalheInput.produtoId);
       if (p) {
-         baseValue = p.valor;
-         nomeServicoFinal = `[${p.nome} - ${p.unidade}]` + (detalheInput.notasServico ? ` ${detalheInput.notasServico}` : '');
+        baseValue = p.valor;
+        nomeServicoFinal = `[${p.nome} - ${p.unidade}]` + (detalheInput.notasServico ? ` ${detalheInput.notasServico}` : '');
       }
     } else {
       baseValue = detalheInput.valorUnitarioBaseLegado || 0;
@@ -188,8 +193,10 @@ const OSForm = () => {
         return arr;
       });
       setEditDetalheIndex(null);
+      toast.info("Detalhe atualizado.");
     } else {
       setDetalhes(prev => [...prev, novoDetalhe]);
+      toast.success("Detalhe adicionado à OS.");
     }
     setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
   };
@@ -199,6 +206,7 @@ const OSForm = () => {
     setDetalheInput(detalhes[idx]);
     setEditDetalheIndex(idx);
   };
+
   const delDetalhe = (idx) => {
     if (isViewMode) return;
     setDetalhes(prev => prev.filter((_, i) => i !== idx));
@@ -206,11 +214,16 @@ const OSForm = () => {
       setEditDetalheIndex(null);
       setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
     }
+    toast.info("Detalhe removido.");
+  };
+
+  const exportarPDF = () => {
+    window.print();
   };
 
   const salvar = async (e) => {
     e.preventDefault();
-    if (!formData.numeroOS) return alert("Número da OS é obrigatório.");
+    if (!formData.numeroOS) return toast.warning("Número da OS é obrigatório.");
     setIsSaving(true);
     try {
       const payloadOs = {
@@ -238,7 +251,7 @@ const OSForm = () => {
         if(error.code === '23505') throw new Error("O número de OS já existe.");
         throw error;
       }
-      alert("Salvo com sucesso!");
+      toast.success("Ordem de Serviço salva com sucesso!");
       if (!osEditId) navigate(`/os-form?id=${formData.numeroOS}`);
     } catch (err) {
       alert("Erro ao salvar: " + err.message);
@@ -253,23 +266,35 @@ const OSForm = () => {
   const produtosLoteAtual = lotes[formData.lote]?.produtos || [];
 
   return (
-    <div className="os-form-layout">
+    <>
+      <div className="os-form-layout">
       <div className="os-form-main">
         <div className="form-header-title">
-          <button className="btn-icon-back" onClick={() => navigate('/lista-os')}><ArrowLeft size={20}/></button>
-          <h2>{isViewMode ? `Visualizando OS ${osEditId}` : (osEditId ? `Editando OS ${osEditId}` : 'Nova Ordem de Serviço')}</h2>
-          
-          {isViewMode && (
-            <button className="btn-primary" style={{marginLeft: 20}} onClick={() => navigate(`/os-form?id=${osEditId}`)}>
-              <Edit size={16} /> Editar OS
+          <div className="form-header-left">
+            <button className="btn-icon-back" onClick={() => navigate('/lista-os')} title="Voltar para a lista">
+              <ArrowLeft size={18} />
             </button>
-          )}
+            <h2 style={{ margin: 0 }}>
+              {isViewMode ? `Visualizando OS ${osEditId}` : (osEditId ? `Editando OS ${osEditId}` : 'Nova Ordem de Serviço')}
+            </h2>
+            {lastEdited && (
+              <span className="badge info" style={{ fontWeight: 'normal' }}>
+                Última edição: {new Date(lastEdited.date).toLocaleString('pt-BR')} por {lastEdited.by}
+              </span>
+            )}
+          </div>
 
-          {lastEdited && (
-            <span className="badge info" style={{marginLeft: 15, fontWeight: 'normal'}}>
-              Última edição: {new Date(lastEdited.date).toLocaleString('pt-BR')} por {lastEdited.by}
-            </span>
-          )}
+          <div className="form-header-right">
+            <button type="button" className="btn-outline" onClick={exportarPDF} title="Exportar PDF da Ordem de Serviço">
+              <Printer size={16} /> Exportar PDF
+            </button>
+            
+            {isViewMode && (
+              <button type="button" className="btn-primary" onClick={() => navigate(`/os-form?id=${osEditId}`)}>
+                <Edit size={16} /> Editar OS
+              </button>
+            )}
+          </div>
         </div>
 
         <form id="osform" onSubmit={salvar}>
@@ -360,7 +385,7 @@ const OSForm = () => {
                     <label>Nome do Responsável *</label><input type="text" name="responsavel" value={detalheInput.responsavel} onChange={handleDetInput} placeholder="Ex: João Silva"/>
                   </div>
                   
-                  <div className="input-group" style={{gridColumn: 'span 2'}}>
+                  <div className="input-group span-2-responsive" style={{gridColumn: 'span 2'}}>
                     <label>Produto / Serviço do Lote *</label>
                     <select 
                       name="produtoId" 
@@ -385,13 +410,13 @@ const OSForm = () => {
                     <label>Quantidade (Diárias/Horas) *</label>
                     <input type="number" step="any" min="0" name="quantidadeDiarias" value={detalheInput.quantidadeDiarias} onChange={handleDetInput} />
                   </div>
-                  <div className="input-group" style={{gridColumn: 'span 2'}}>
+                  <div className="input-group span-2-responsive" style={{gridColumn: 'span 2'}}>
                     <label>Notas adicionais sobre o serviço (Opcional)</label>
                     <textarea name="notasServico" value={detalheInput.notasServico} onChange={handleDetInput} placeholder="Ex: Câmera 1, Trilha sonora..." rows="1"/>
                   </div>
                 </div>
                 
-                <div style={{display:'flex', justifyContent:'flex-end', gap: '10px'}}>
+                <div style={{display:'flex', justifyContent:'flex-end', gap: '10px', flexWrap: 'wrap'}}>
                   {editDetalheIndex !== null && (
                     <button type="button" className="btn-outline" onClick={() => {setEditDetalheIndex(null); setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 })}}>Cancelar edição</button>
                   )}
@@ -411,12 +436,16 @@ const OSForm = () => {
             ) : (
               <div className="resp-tabs-container">
                 <div className="resp-tabs">
-                  {Object.keys(despesasResponsaveis).map(nome => (
-                    <button key={nome} type="button" className={`resp-tab ${activeRespTab === nome ? 'active' : ''}`} onClick={() => setActiveRespTab(nome)}>
-                      {nome}
-                      <span className={`status-dot ${despesasResponsaveis[nome].statusPagamento === 'Pago' ? 'green' : 'red'}`}></span>
-                    </button>
-                  ))}
+                  {Object.keys(despesasResponsaveis).map(nome => {
+                    const st = despesasResponsaveis[nome].statusPagamento;
+                    const dotClass = st === 'Pago' ? 'green' : (st === 'Não se aplica' ? 'gray' : 'red');
+                    return (
+                      <button key={nome} type="button" className={`resp-tab ${activeRespTab === nome ? 'active' : ''}`} onClick={() => setActiveRespTab(nome)}>
+                        {nome}
+                        <span className={`status-dot ${dotClass}`}></span>
+                      </button>
+                    );
+                  })}
                 </div>
                 
                 {activeRespTab && (
@@ -431,10 +460,17 @@ const OSForm = () => {
                       <div className="input-group"><label>Agendamento</label><input type="date" name="agendamento" value={respData.agendamento} onChange={handleRespInput} disabled={isViewMode}/></div>
                       <div className="input-group">
                         <label>Status do Pagamento</label>
-                        <select name="statusPagamento" value={respData.statusPagamento} onChange={handleRespInput} className={respData.statusPagamento === 'Pago' ? 'text-success' : (respData.statusPagamento === 'Pendente' ? 'text-danger' : '')} disabled={isViewMode}>
+                        <select 
+                          name="statusPagamento" 
+                          value={respData.statusPagamento} 
+                          onChange={handleRespInput} 
+                          className={respData.statusPagamento === 'Pago' ? 'text-success' : (respData.statusPagamento === 'Pendente' ? 'text-danger' : '')} 
+                          disabled={isViewMode}
+                        >
                           <option value="">Selecione...</option>
                           <option value="Pendente">Pendente</option>
                           <option value="Pago">Pago</option>
+                          <option value="Não se aplica">Não se aplica</option>
                         </select>
                       </div>
                       <div className="input-group"><label>Data do Pagamento</label><input type="date" name="dataPagamento" value={respData.dataPagamento} onChange={handleRespInput} disabled={isViewMode}/></div>
@@ -501,6 +537,163 @@ const OSForm = () => {
         </div>
       </div>
     </div>
+
+      {/* DOCUMENTO OFICIAL A4 PARA EXPORTAÇÃO EM PDF / IMPRESSÃO */}
+      <div id="printable-os">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0084ff', paddingBottom: 15, marginBottom: 20 }}>
+          <div>
+            <img src={sebraeLogo} alt="Sebrae" style={{ height: 45, marginBottom: 5 }} />
+            <div style={{ fontSize: 13, color: '#4b5563' }}>Gestão de Ordens de Serviço & Produção Audiovisual</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <h1 style={{ margin: 0, fontSize: 24, color: '#0084ff' }}>ORDEM DE SERVIÇO</h1>
+            <div style={{ fontSize: 18, fontWeight: 'bold', color: '#111827' }}>Nº {formData.numeroOS || '---'}</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Emitida em: {new Date().toLocaleDateString('pt-BR')}
+            </div>
+          </div>
+        </div>
+
+        {/* Informações Gerais */}
+        <div style={{ background: '#f8fafc', padding: 15, borderRadius: 6, marginBottom: 20, border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: 13 }}>
+            <div><strong>Lote:</strong> {lotes[formData.lote]?.nome || formData.lote || '-'}</div>
+            <div><strong>NFS-e:</strong> {formData.nfsE || 'Não preenchida'}</div>
+            <div><strong>Conta Azul:</strong> {formData.statusContaAzul || 'Pendente'}</div>
+            <div><strong>Endereço:</strong> {formData.endereco || 'Não informado'}</div>
+          </div>
+          {formData.adicionais && (
+            <div style={{ marginTop: 8, fontSize: 12, color: '#4b5563' }}>
+              <strong>Adicionais:</strong> {formData.adicionais}
+            </div>
+          )}
+        </div>
+
+        {/* Tabela de Detalhes de Serviços */}
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: '#1e293b', borderBottom: '1px solid #cbd5e1', paddingBottom: 5, marginBottom: 10 }}>
+            1. Detalhamento dos Serviços Executados
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Data</th>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Dia</th>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Responsável</th>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Serviço / Produto</th>
+                <th style={{ padding: '6px 8px', textAlign: 'center' }}>Entrada</th>
+                <th style={{ padding: '6px 8px', textAlign: 'center' }}>Saída</th>
+                <th style={{ padding: '6px 8px', textAlign: 'center' }}>Qtd</th>
+                <th style={{ padding: '6px 8px', textAlign: 'right' }}>Valor Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detalhes.length > 0 ? detalhes.map((d, idx) => (
+                <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '6px 8px' }}>{d.data ? d.data.split('-').reverse().join('/') : '-'}</td>
+                  <td style={{ padding: '6px 8px' }}>{getDayOfWeek(d.data)}</td>
+                  <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>{d.responsavel}</td>
+                  <td style={{ padding: '6px 8px' }}>{d.servico}</td>
+                  <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.horarioGravacao || '-'}</td>
+                  <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.horarioSaida || '-'}</td>
+                  <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.quantidadeDiarias}</td>
+                  <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>
+                    R$ {Number(d.valorUnitario || 0).toFixed(2).replace('.', ',')}
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan="8" style={{ padding: 10, textAlign: 'center', color: '#6b7280' }}>Nenhum serviço registrado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Tabela de Responsáveis e Pagamentos */}
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, textTransform: 'uppercase', color: '#1e293b', borderBottom: '1px solid #cbd5e1', paddingBottom: 5, marginBottom: 10 }}>
+            2. Equipe e Custos de Despesas
+          </h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1' }}>
+                <th style={{ padding: '6px 8px', textAlign: 'left' }}>Nome</th>
+                <th style={{ padding: '6px 8px', textAlign: 'right' }}>Freelance</th>
+                <th style={{ padding: '6px 8px', textAlign: 'right' }}>Condução</th>
+                <th style={{ padding: '6px 8px', textAlign: 'right' }}>Alimentação</th>
+                <th style={{ padding: '6px 8px', textAlign: 'right' }}>Hospedagem</th>
+                <th style={{ padding: '6px 8px', textAlign: 'right' }}>Total Despesas</th>
+                <th style={{ padding: '6px 8px', textAlign: 'center' }}>Agendamento</th>
+                <th style={{ padding: '6px 8px', textAlign: 'center' }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.keys(despesasResponsaveis).length > 0 ? Object.entries(despesasResponsaveis).map(([nome, r], idx) => {
+                const subTotal = (Number(r.valorFreelance) || 0) + (Number(r.reembolsoConducao) || 0) + 
+                                 (Number(r.reembolsoAlimentacao) || 0) + (Number(r.reembolsoHospedagem) || 0);
+                return (
+                  <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>{nome}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>R$ {(Number(r.valorFreelance) || 0).toFixed(2).replace('.', ',')}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>R$ {(Number(r.reembolsoConducao) || 0).toFixed(2).replace('.', ',')}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>R$ {(Number(r.reembolsoAlimentacao) || 0).toFixed(2).replace('.', ',')}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>R$ {(Number(r.reembolsoHospedagem) || 0).toFixed(2).replace('.', ',')}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>R$ {subTotal.toFixed(2).replace('.', ',')}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center' }}>{r.agendamento ? r.agendamento.split('-').reverse().join('/') : '-'}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'center' }}>{r.statusPagamento || 'Pendente'}</td>
+                  </tr>
+                );
+              }) : (
+                <tr><td colSpan="8" style={{ padding: 10, textAlign: 'center', color: '#6b7280' }}>Nenhum custo de equipe registrado.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Resumo Financeiro da OS */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 25 }}>
+          <div>
+            <h4 style={{ fontSize: 13, textTransform: 'uppercase', margin: '0 0 8px 0', color: '#1e293b' }}>Observações & Briefing</h4>
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: 4, padding: 10, fontSize: 11, minHeight: 70, color: '#4b5563', background: '#fafafa' }}>
+              {formData.observacoes || 'Nenhuma observação informada.'}
+            </div>
+          </div>
+
+          <div style={{ border: '1px solid #cbd5e1', borderRadius: 6, padding: 12, background: '#f8fafc' }}>
+            <h4 style={{ fontSize: 13, textTransform: 'uppercase', margin: '0 0 10px 0', color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: 4 }}>
+              Demonstrativo Financeiro
+            </h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+              <span>Faturamento Total:</span>
+              <strong>R$ {financeiro.faturamento.toFixed(2).replace('.', ',')}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4, color: '#dc2626' }}>
+              <span>(-) Despesas da Equipe:</span>
+              <span>- R$ {financeiro.custoResponsaveis.toFixed(2).replace('.', ',')}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6, color: '#dc2626' }}>
+              <span>(-) Impostos (ISS {(aliquotaISS * 100).toFixed(2)}%):</span>
+              <span>- R$ {financeiro.iss.toFixed(2).replace('.', ',')}</span>
+            </div>
+            <div style={{ borderTop: '2px solid #cbd5e1', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 'bold', color: '#166534' }}>
+              <span>Lucro Líquido Previsto:</span>
+              <span>R$ {financeiro.lucro.toFixed(2).replace('.', ',')} ({financeiro.margem.toFixed(1)}%)</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Assinaturas */}
+        <div style={{ marginTop: 40, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, textAlign: 'center', fontSize: 12 }}>
+          <div>
+            <div style={{ borderBottom: '1px solid #000', marginBottom: 5 }}></div>
+            <div>Responsável / Coordenação</div>
+          </div>
+          <div>
+            <div style={{ borderBottom: '1px solid #000', marginBottom: 5 }}></div>
+            <div>Aprovação Financeira / SEBRAE</div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
 export default OSForm;

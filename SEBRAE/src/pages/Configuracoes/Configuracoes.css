@@ -85,3 +85,69 @@
   color: var(--text-main);
   font-weight: 500;
 }
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
+
+.avatar-upload-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #0084ff;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: bold;
+  color: #0084ff;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.log-summary-text {
+  font-weight: 500;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.log-entity-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.log-entity-tag.os { background: #e0f2fe; color: #0284c7; }
+.log-entity-tag.lote { background: #fef3c7; color: #b45309; }
+.log-entity-tag.config { background: #f3e8ff; color: #7e22ce; }
+
+.json-viewer {
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 15px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 12px;
+  overflow-x: auto;
+  max-height: 350px;
+}

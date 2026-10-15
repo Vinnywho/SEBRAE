@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { supabase } from "../../supabase";
 import logos from "../../assets/icons/logos.svg";
@@ -7,17 +7,33 @@ import "./Layout.css";
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [userEmail, setUserEmail] = useState("");
+  const [userProfile, setUserProfile] = useState({ email: '', name: '', avatar: '' });
   const navigate = useNavigate();
 
   useEffect(() => {
     const getLoggedUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        setUserEmail(user.email);
+        setUserProfile({
+          email: user.email || '',
+          name: user.user_metadata?.full_name || '',
+          avatar: user.user_metadata?.avatar_url || ''
+        });
       }
     };
     getLoggedUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUserProfile({
+          email: session.user.email || '',
+          name: session.user.user_metadata?.full_name || '',
+          avatar: session.user.user_metadata?.avatar_url || ''
+        });
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleLogout = async () => {
@@ -79,8 +95,24 @@ const Layout = () => {
             <button className="btn-primary" style={{ padding: '8px 16px', fontSize: '14px' }} onClick={() => navigate('/os-form')}>
               <Plus size={16} /> Nova OS
             </button>
-            <div className="user-profile">
-              <div className="avatar">{userEmail ? userEmail.charAt(0).toUpperCase() : 'U'}</div>
+            <div 
+              className="user-profile" 
+              onClick={() => navigate('/configuracoes')} 
+              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
+              title="Ir para Minha Conta"
+            >
+              {userProfile.name && (
+                <span className="user-name-header" style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>
+                  {userProfile.name}
+                </span>
+              )}
+              <div className="avatar" style={{ overflow: 'hidden' }}>
+                {userProfile.avatar ? (
+                  <img src={userProfile.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  (userProfile.name ? userProfile.name.charAt(0) : (userProfile.email ? userProfile.email.charAt(0) : 'U')).toUpperCase()
+                )}
+              </div>
             </div>
           </div>
         </header>

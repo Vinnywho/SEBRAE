@@ -56,7 +56,7 @@ const Dashboard = () => {
 
             if (os.os_responsaveis && os.os_responsaveis.length > 0) {
               os.os_responsaveis.forEach(r => {
-                if (r.status_pagamento !== 'Pago') {
+                if (r.status_pagamento !== 'Pago' && r.status_pagamento !== 'Não se aplica') {
                   const totalPg = (Number(r.valor_freelance)||0) + (Number(r.reembolso_conducao)||0) + 
                                   (Number(r.reembolso_alimentacao)||0) + (Number(r.reembolso_hospedagem)||0);
                   pendentesPag.push({ ...r, numero_os: os.numero_os, total: totalPg, endereco: os.endereco });
@@ -83,7 +83,6 @@ const Dashboard = () => {
           });
           
           setPendingOS(pendentesCA);
-          // Sort payments by OS number implicitly or just leave as is
           setPendingPayments(pendentesPag);
           
           const currentDay = new Date().getDate();

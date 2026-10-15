@@ -1,13 +1,15 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '../../context/ConfigContext';
+import { useToast } from '../../context/ToastContext';
 import { isRecentlyEdited } from '../../utils/format';
 import { Edit2, Trash2, Search, Plus, Clock, FileText, Download, CheckSquare, Filter } from 'lucide-react';
 import './ListaOS.css';
 
 const ListaOS = () => {
   const navigate = useNavigate();
+  const { toast, confirmDialog } = useToast();
   const [listaOS, setListaOS] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dataInicio, setDataInicio] = useState('');
@@ -38,7 +40,16 @@ const ListaOS = () => {
   };
 
   const deletarOS = async (numero_os) => {
-    if (!window.confirm(`Tem certeza que deseja deletar a OS ${numero_os}? Essa ação não pode ser desfeita.`)) return;
+    const confirmed = await confirmDialog({
+      title: 'Excluir Ordem de Serviço',
+      message: `Tem certeza que deseja deletar a OS ${numero_os}? Essa ação removerá todos os detalhes e custos associados permanentemente.`,
+      confirmText: 'Sim, excluir',
+      cancelText: 'Cancelar',
+      isDanger: true
+    });
+
+    if (!confirmed) return;
+
     try {
       const { error } = await supabase
         .from('ordens_servico')
@@ -47,8 +58,9 @@ const ListaOS = () => {
       if (error) throw error;
       setListaOS(listaOS.filter(os => os.numero_os !== numero_os));
       setSelectedOSs(prev => prev.filter(id => id !== numero_os));
+      toast.success(`OS ${numero_os} excluída com sucesso!`);
     } catch (err) {
-      alert("Erro ao deletar OS: " + err.message);
+      toast.error("Erro ao deletar OS: " + err.message);
     }
   };
 
@@ -87,7 +99,7 @@ const ListaOS = () => {
   };
 
   const aplicarNfsE = async () => {
-    if (!bulkNfsE.trim()) return alert('Digite o número da NFS-e que deseja aplicar.');
+    if (!bulkNfsE.trim()) return toast.warning('Digite o número da NFS-e que deseja aplicar.');
     try {
       const { error } = await supabase
         .from('ordens_servico')
@@ -96,17 +108,17 @@ const ListaOS = () => {
         
       if (error) throw error;
       
-      alert('NFS-e atribuída com sucesso para as OSs selecionadas!');
+      toast.success('NFS-e atribuída com sucesso para as OSs selecionadas!');
       setBulkNfsE('');
       setSelectedOSs([]);
       fetchOS(); // Recarrega para ver as mudanças
     } catch (err) {
-      alert('Erro ao atribuir NFS-e: ' + err.message);
+      toast.error('Erro ao atribuir NFS-e: ' + err.message);
     }
   };
 
   const exportToCSV = async () => {
-    if (filteredOS.length === 0) return alert('Não há dados para exportar com os filtros atuais.');
+    if (filteredOS.length === 0) return toast.warning('Não há dados para exportar com os filtros atuais.');
     
     setIsLoading(true);
     try {
@@ -188,8 +200,9 @@ const ListaOS = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      toast.success("CSV detalhado exportado com sucesso!");
     } catch (err) {
-      alert("Erro ao exportar: " + err.message);
+      toast.error("Erro ao exportar: " + err.message);
     } finally {
       setIsLoading(false);
     }
