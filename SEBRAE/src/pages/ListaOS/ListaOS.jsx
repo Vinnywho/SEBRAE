@@ -256,7 +256,7 @@ const ListaOS = () => {
               <Search size={18} className="search-icon" />
               <input 
                 type="text" 
-                placeholder="Buscar por número ou endereço..." 
+                placeholder="Buscar por número ou nome..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />

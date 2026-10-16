@@ -583,7 +583,7 @@ const Configuracoes = () => {
               Histórico resumido das ações registradas no sistema (criação, edição e exclusão).
             </p>
             {loadingLogs ? <p>Carregando logs...</p> : (
-              <div className="table-responsive" style={{ maxHeight: '550px' }}>
+              <div className="table-responsive" style={{ maxHeight: 'auto' }}>
                 <table className="table config-table">
                   <thead>
                     <tr>
