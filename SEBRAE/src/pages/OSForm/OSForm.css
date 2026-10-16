@@ -274,35 +274,81 @@
 
 /* REGRAS DE IMPRESSÃO / PDF NATIVO */
 @media print {
-  /* Esconde tudo do layout regular */
+  /* Reseta configurações globais para permitir fluxo completo de páginas sem corte */
+  html, body, #root {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Garante que todos os containers pais de #printable-os fiquem visíveis e fluam normalmente */
   .layout-wrapper,
-  .top-header,
+  .main-content,
+  .page-content {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Oculta tudo que NÃO deve sair no PDF / Impressão */
   .sidebar,
+  .sidebar-mobile-overlay,
+  .top-header,
   .os-form-layout,
   .toast-container,
-  .confirm-overlay {
+  .confirm-overlay,
+  .btn-icon-back,
+  header,
+  nav,
+  aside {
     display: none !important;
   }
 
   /* Exibe exclusivamente o documento oficial de impressão */
   #printable-os {
     display: block !important;
+    visibility: visible !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 20px !important;
-    font-family: 'Segoe UI', Arial, sans-serif !important;
+    padding: 0 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
     color: #111827 !important;
     background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  body {
-    background: #ffffff !important;
-    margin: 0 !important;
+  /* Quebras de página e formatação de tabelas no PDF */
+  #printable-os table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  #printable-os tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  #printable-os thead {
+    display: table-header-group;
   }
 
   @page {
     size: A4 portrait;
-    margin: 15mm;
+    margin: 12mm 15mm;
   }
 }
 

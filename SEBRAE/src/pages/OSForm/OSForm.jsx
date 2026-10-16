@@ -220,7 +220,15 @@ const OSForm = () => {
   };
 
   const exportarPDF = () => {
+    const originalTitle = document.title;
+    if (formData.numeroOS) {
+      const sanitizedName = (formData.nomeOS || 'Sebrae').replace(/[^a-zA-Z0-9_-]/g, '_');
+      document.title = `OS_${formData.numeroOS}_${sanitizedName}`;
+    }
     window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1000);
   };
 
   const salvar = async (e) => {
@@ -570,7 +578,7 @@ const OSForm = () => {
 
         {/* Informações Gerais */}
         <div style={{ background: '#f8fafc', padding: 15, borderRadius: 6, marginBottom: 20, border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, fontSize: 13 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, fontSize: 13 }}>
             <div><strong>Lote:</strong> {lotes[formData.lote]?.nome || formData.lote || '-'}</div>
             <div><strong>Nome da OS:</strong> {formData.nomeOS || '-'}</div>
             <div><strong>Cidade:</strong> {formData.cidade || 'Não informada'}</div>
@@ -608,7 +616,10 @@ const OSForm = () => {
                   <td style={{ padding: '6px 8px' }}>{d.data ? d.data.split('-').reverse().join('/') : '-'}</td>
                   <td style={{ padding: '6px 8px' }}>{getDayOfWeek(d.data)}</td>
                   <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>{d.responsavel}</td>
-                  <td style={{ padding: '6px 8px' }}>{d.servico}</td>
+                  <td style={{ padding: '6px 8px' }}>
+                    <div style={{ fontWeight: '500' }}>{d.servico}</div>
+                    {d.notasServico && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{d.notasServico}</div>}
+                  </td>
                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.horarioGravacao || '-'}</td>
                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.horarioSaida || '-'}</td>
                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.quantidadeDiarias}</td>
