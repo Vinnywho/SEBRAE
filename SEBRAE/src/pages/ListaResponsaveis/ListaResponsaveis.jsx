@@ -12,6 +12,8 @@ const ListaResponsaveis = () => {
   const [responsaveis, setResponsaveis] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
+  const [dataAgendamentoInicio, setDataAgendamentoInicio] = useState('');
+  const [dataAgendamentoFim, setDataAgendamentoFim] = useState('');
   const [agruparPorPessoa, setAgruparPorPessoa] = useState(false);
   const [expandedPessoas, setExpandedPessoas] = useState({});
   const [isLoading, setIsLoading] = useState(true);
@@ -60,9 +62,18 @@ const ListaResponsaveis = () => {
       if (statusFilter !== 'TODOS') {
         matchStatus = st === statusFilter;
       }
-      return matchSearch && matchStatus;
+
+      let matchDate = true;
+      if (dataAgendamentoInicio) {
+        matchDate = matchDate && r.agendamento && r.agendamento >= dataAgendamentoInicio;
+      }
+      if (dataAgendamentoFim) {
+        matchDate = matchDate && r.agendamento && r.agendamento <= dataAgendamentoFim;
+      }
+
+      return matchSearch && matchStatus && matchDate;
     });
-  }, [responsaveis, searchTerm, statusFilter]);
+  }, [responsaveis, searchTerm, statusFilter, dataAgendamentoInicio, dataAgendamentoFim]);
 
   // Agrupamento por Responsável
   const groupedData = useMemo(() => {
@@ -170,6 +181,35 @@ const ListaResponsaveis = () => {
                   {st === 'TODOS' ? 'Todos os Status' : st}
                 </button>
               ))}
+            </div>
+
+            <div className="date-filters">
+              <div className="date-filter-group">
+                <label>Agendado De:</label>
+                <input 
+                  type="date" 
+                  value={dataAgendamentoInicio} 
+                  onChange={(e) => setDataAgendamentoInicio(e.target.value)} 
+                />
+              </div>
+              <div className="date-filter-group">
+                <label>Até:</label>
+                <input 
+                  type="date" 
+                  value={dataAgendamentoFim} 
+                  onChange={(e) => setDataAgendamentoFim(e.target.value)} 
+                />
+              </div>
+              {(dataAgendamentoInicio || dataAgendamentoFim) && (
+                <button 
+                  type="button" 
+                  className="btn-clear-date"
+                  onClick={() => { setDataAgendamentoInicio(''); setDataAgendamentoFim(''); }}
+                  title="Limpar filtro de data de agendamento"
+                >
+                  Limpar Data
+                </button>
+              )}
             </div>
           </div>
 

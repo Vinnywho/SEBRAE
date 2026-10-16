@@ -8,6 +8,33 @@ import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit, Printer } from 'lucide-reac
 import sebraeLogo from '../../assets/img/sebrae.svg';
 import './OSForm.css';
 
+const parseServico = (servicoStr) => {
+  if (!servicoStr) return { baseServico: '', notasServico: '' };
+  
+  // Formato com colchetes: [Nome Produto - Unidade] notas
+  if (servicoStr.startsWith('[')) {
+    const closeBracketIdx = servicoStr.indexOf(']');
+    if (closeBracketIdx !== -1) {
+      const base = servicoStr.substring(0, closeBracketIdx + 1);
+      let rest = servicoStr.substring(closeBracketIdx + 1).trim();
+      if (rest.startsWith('|')) {
+        rest = rest.substring(1).trim();
+      }
+      return { baseServico: base, notasServico: rest };
+    }
+  }
+
+  // Formato com pipe: Base | Notas
+  const pipeIdx = servicoStr.indexOf(' | ');
+  if (pipeIdx !== -1) {
+    const base = servicoStr.substring(0, pipeIdx).trim();
+    const rest = servicoStr.substring(pipeIdx + 3).trim();
+    return { baseServico: base, notasServico: rest };
+  }
+
+  return { baseServico: servicoStr, notasServico: '' };
+};
+
 const OSForm = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -27,7 +54,7 @@ const OSForm = () => {
 
   const [detalhes, setDetalhes] = useState([]);
   const [detalheInput, setDetalheInput] = useState({
-    data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0
+    data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', baseServico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0
   });
   const [editDetalheIndex, setEditDetalheIndex] = useState(null);
 
@@ -68,13 +95,15 @@ const OSForm = () => {
         const mappedDetalhes = (detData || []).map(d => {
           const qtd = Number(d.quantidade_diarias) || 1;
           const total = Number(d.valor_unitario) || 0;
+          const { baseServico, notasServico } = parseServico(d.servico);
           return {
             data: d.data_servico || '',
             responsavel: d.responsavel_servico || '',
             horarioGravacao: d.horario_gravacao || '',
             horarioSaida: d.horario_saida || '',
             servico: d.servico || '',
-            notasServico: '',
+            baseServico: baseServico,
+            notasServico: notasServico,
             produtoId: 'legacy',
             quantidadeDiarias: qtd,
             valorUnitarioBaseLegado: total / qtd,
@@ -99,7 +128,7 @@ const OSForm = () => {
         if (Object.keys(respDict).length > 0) setActiveRespTab(Object.keys(respDict)[0]);
 
       } catch (error) {
-        alert("Erro ao carregar OS");
+        toast.error("Erro ao carregar OS");
         navigate('/lista-os');
       } finally {
         setIsLoading(false);
@@ -169,21 +198,30 @@ const OSForm = () => {
     }
     
     let baseValue = 0;
-    let nomeServicoFinal = detalheInput.servico;
+    let baseNome = '';
 
     if (detalheInput.produtoId !== 'legacy') {
       const p = lotes[formData.lote]?.produtos?.find(x => x.id === detalheInput.produtoId);
       if (p) {
         baseValue = p.valor;
-        nomeServicoFinal = `[${p.nome} - ${p.unidade}]` + (detalheInput.notasServico ? ` ${detalheInput.notasServico}` : '');
+        baseNome = `[${p.nome} - ${p.unidade}]`;
+      } else {
+        baseNome = detalheInput.baseServico || parseServico(detalheInput.servico).baseServico || detalheInput.servico;
+        baseValue = detalheInput.valorUnitarioBaseLegado || 0;
       }
     } else {
       baseValue = detalheInput.valorUnitarioBaseLegado || 0;
-      nomeServicoFinal = detalheInput.notasServico ? `${detalheInput.servico} | ${detalheInput.notasServico}` : detalheInput.servico;
+      baseNome = detalheInput.baseServico || parseServico(detalheInput.servico).baseServico || detalheInput.servico;
     }
+
+    const notasLimpa = (detalheInput.notasServico || '').trim();
+    // Sobrescreve sempre: se houver notas preenchidas, concatena "Base | Notas", caso contrário apenas "Base"
+    const nomeServicoFinal = notasLimpa ? `${baseNome} | ${notasLimpa}` : baseNome;
 
     const novoDetalhe = { 
       ...detalheInput, 
+      baseServico: baseNome,
+      notasServico: notasLimpa,
       servico: nomeServicoFinal,
       valorUnitario: baseValue * Number(detalheInput.quantidadeDiarias)
     };
@@ -200,12 +238,31 @@ const OSForm = () => {
       setDetalhes(prev => [...prev, novoDetalhe]);
       toast.success("Detalhe adicionado à OS.");
     }
-    setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
+    setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', baseServico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
   };
 
   const editDetalhe = (idx) => {
     if (isViewMode) return;
-    setDetalheInput(detalhes[idx]);
+    const item = detalhes[idx];
+    const { baseServico, notasServico } = parseServico(item.servico);
+
+    let matchedProdId = item.produtoId;
+    if (formData.lote && lotes[formData.lote]?.produtos) {
+      const cleanBase = item.baseServico || baseServico;
+      const found = lotes[formData.lote].produtos.find(p => 
+        `[${p.nome} - ${p.unidade}]` === cleanBase || p.nome === cleanBase
+      );
+      if (found) {
+        matchedProdId = found.id;
+      }
+    }
+
+    setDetalheInput({
+      ...item,
+      baseServico: item.baseServico || baseServico,
+      notasServico: item.notasServico !== undefined && item.notasServico !== '' ? item.notasServico : notasServico,
+      produtoId: matchedProdId || item.produtoId || 'legacy'
+    });
     setEditDetalheIndex(idx);
   };
 
@@ -214,7 +271,7 @@ const OSForm = () => {
     setDetalhes(prev => prev.filter((_, i) => i !== idx));
     if (editDetalheIndex === idx) {
       setEditDetalheIndex(null);
-      setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
+      setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', baseServico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
     }
     toast.info("Detalhe removido.");
   };
@@ -272,7 +329,7 @@ const OSForm = () => {
       toast.success("Ordem de Serviço salva com sucesso!");
       if (!osEditId) navigate(`/os-form?id=${formData.numeroOS}`);
     } catch (err) {
-      alert("Erro ao salvar: " + err.message);
+      toast.error("Erro ao salvar: " + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -440,7 +497,7 @@ const OSForm = () => {
                 
                 <div style={{display:'flex', justifyContent:'flex-end', gap: '10px', flexWrap: 'wrap'}}>
                   {editDetalheIndex !== null && (
-                    <button type="button" className="btn-outline" onClick={() => {setEditDetalheIndex(null); setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 })}}>Cancelar edição</button>
+                    <button type="button" className="btn-outline" onClick={() => {setEditDetalheIndex(null); setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', baseServico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 })}}>Cancelar edição</button>
                   )}
                   <button type="button" className="btn-primary" onClick={addOrUpdateDetalhe}>
                     <Plus size={16}/> {editDetalheIndex !== null ? 'Atualizar Detalhe' : 'Adicionar Detalhe'}
@@ -617,7 +674,7 @@ const OSForm = () => {
                   <td style={{ padding: '6px 8px' }}>{getDayOfWeek(d.data)}</td>
                   <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>{d.responsavel}</td>
                   <td style={{ padding: '6px 8px' }}>
-                    <div style={{ fontWeight: '500' }}>{d.servico}</div>
+                    <div style={{ fontWeight: '500' }}>{d.baseServico || d.servico}</div>
                     {d.notasServico && <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{d.notasServico}</div>}
                   </td>
                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.horarioGravacao || '-'}</td>

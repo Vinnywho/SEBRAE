@@ -1,4 +1,4 @@
-﻿.lista-resp-container {
+.lista-resp-container {
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -104,6 +104,61 @@
   color: #475569;
 }
 
+.date-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.date-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-filter-group label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.date-filter-group input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #ffffff;
+  color: #334155;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.date-filter-group input[type="date"]:focus {
+  border-color: #0084ff;
+  box-shadow: 0 0 0 2px rgba(0, 132, 255, 0.1);
+}
+
+.btn-clear-date {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-clear-date:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+  color: #dc2626;
+}
+
 @media (max-width: 768px) {
   .resp-filter-bar {
     flex-direction: column;
@@ -116,6 +171,17 @@
   .status-pills {
     width: 100%;
     justify-content: flex-start;
+  }
+  .date-filters {
+    width: 100%;
+    gap: 8px;
+  }
+  .date-filter-group {
+    flex: 1;
+    min-width: 130px;
+  }
+  .date-filter-group input[type="date"] {
+    width: 100%;
   }
   .toggle-group-btn {
     width: 100%;
