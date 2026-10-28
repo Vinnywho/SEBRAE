@@ -219,15 +219,62 @@ const Configuracoes = () => {
       const rAntigo = antigo.responsaveis || [];
       const rNovo = novo.responsaveis || [];
       if (JSON.stringify(rAntigo) !== JSON.stringify(rNovo)) {
-        diffs.push({
-          campo: 'Equipe / Responsáveis',
-          chave: 'responsaveis',
-          antes: `${rAntigo.length} responsável(is)`,
-          depois: `${rNovo.length} responsável(is)`,
-          respAntigo: rAntigo,
-          respNovo: rNovo,
-          tipoArray: 'responsaveis'
+        if (rAntigo.length !== rNovo.length) {
+          diffs.push({
+            campo: 'Equipe / Responsáveis',
+            chave: 'responsaveis',
+            antes: `${rAntigo.length} responsável(is)`,
+            depois: `${rNovo.length} responsável(is)`,
+            respAntigo: rAntigo,
+            respNovo: rNovo,
+            tipoArray: 'responsaveis'
+          });
+        }
+
+        // Compara cada responsável para exibir campos alterados pontuais (ex: Status Pgto, Data Pgto)
+        const mapAntigo = new Map(rAntigo.map(r => [r.nome || '', r]));
+        const mapNovo = new Map(rNovo.map(r => [r.nome || '', r]));
+
+        mapNovo.forEach((respNovo, nome) => {
+          const respAntigo = mapAntigo.get(nome);
+          if (respAntigo) {
+            const stAntigo = respAntigo.status_pagamento || 'Pendente';
+            const stNovo = respNovo.status_pagamento || 'Pendente';
+            if (stAntigo !== stNovo) {
+              diffs.push({
+                campo: `Status Pgto (${nome || 'Responsável'})`,
+                chave: `status_pagamento_${nome}`,
+                antes: stAntigo,
+                depois: stNovo
+              });
+            }
+
+            const dtAntiga = respAntigo.data_pagamento || '';
+            const dtNova = respNovo.data_pagamento || '';
+            if (dtAntiga !== dtNova) {
+              diffs.push({
+                campo: `Data Pgto (${nome || 'Responsável'})`,
+                chave: `data_pagamento_${nome}`,
+                antes: dtAntiga ? dtAntiga.split('-').reverse().join('/') : '(vazio)',
+                depois: dtNova ? dtNova.split('-').reverse().join('/') : '(vazio)'
+              });
+            }
+          }
         });
+
+        // Caso não tenha entrado nas condições acima mas o JSON seja diferente
+        const jaAdicionouResp = diffs.some(d => d.chave === 'responsaveis' || d.chave.startsWith('status_pagamento_') || d.chave.startsWith('data_pagamento_'));
+        if (!jaAdicionouResp) {
+          diffs.push({
+            campo: 'Equipe / Responsáveis',
+            chave: 'responsaveis',
+            antes: `${rAntigo.length} responsável(is)`,
+            depois: `${rNovo.length} responsável(is)`,
+            respAntigo: rAntigo,
+            respNovo: rNovo,
+            tipoArray: 'responsaveis'
+          });
+        }
       }
     }
 

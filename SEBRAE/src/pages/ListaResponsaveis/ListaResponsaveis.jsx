@@ -198,21 +198,30 @@ const ListaResponsaveis = () => {
 
     setIsBulkUpdating(true);
     try {
-      const updatePayload = {
-        status_pagamento: bulkStatus
-      };
-      if (bulkStatus === 'Pago') {
-        updatePayload.data_pagamento = bulkDataPagamento || new Date().toISOString().split('T')[0];
-      } else {
-        updatePayload.data_pagamento = null;
+      const dataPgto = bulkStatus === 'Pago' ? (bulkDataPagamento || new Date().toISOString().split('T')[0]) : null;
+
+      // 1. Tentar executar via RPC para atualizar e gravar logs de auditoria completos
+      const { error: rpcError } = await supabase.rpc('atualizar_status_responsaveis_em_massa', {
+        p_ids: selectedIds,
+        p_status: bulkStatus,
+        p_data_pagamento: dataPgto
+      });
+
+      // 2. Fallback caso a RPC ainda não tenha sido executada no banco
+      if (rpcError) {
+        console.warn('RPC atualizar_status_responsaveis_em_massa não encontrada ou falhou, usando fallback direto:', rpcError);
+        const updatePayload = {
+          status_pagamento: bulkStatus,
+          data_pagamento: dataPgto
+        };
+
+        const { error: fallbackError } = await supabase
+          .from('os_responsaveis')
+          .update(updatePayload)
+          .in('id', selectedIds);
+
+        if (fallbackError) throw fallbackError;
       }
-
-      const { error } = await supabase
-        .from('os_responsaveis')
-        .update(updatePayload)
-        .in('id', selectedIds);
-
-      if (error) throw error;
 
       toast.success(`Status "${bulkStatus}" atribuído com sucesso para ${selectedIds.length} ${selectedIds.length === 1 ? 'responsável' : 'responsáveis'}!`);
       setSelectedIds([]);

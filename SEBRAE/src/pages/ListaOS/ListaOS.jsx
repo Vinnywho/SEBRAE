@@ -124,14 +124,25 @@ const ListaOS = () => {
   };
 
   const aplicarNfsE = async () => {
-    if (!bulkNfsE.trim()) return toast.warning('Digite o número da NFS-e que deseja aplicar.');
+    const nfsTrimmed = bulkNfsE.trim();
+    if (!nfsTrimmed) return toast.warning('Digite o número da NFS-e que deseja aplicar.');
     try {
-      const { error } = await supabase
-        .from('ordens_servico')
-        .update({ nfs_e: bulkNfsE })
-        .in('numero_os', selectedOSs);
-        
-      if (error) throw error;
+      // 1. Tentar executar via RPC para gravar logs de auditoria completos
+      const { error: rpcError } = await supabase.rpc('atualizar_nfs_e_em_massa', {
+        p_numeros_os: selectedOSs,
+        p_nfs_e: nfsTrimmed
+      });
+
+      // 2. Fallback caso a RPC ainda não tenha sido executada no banco
+      if (rpcError) {
+        console.warn('RPC atualizar_nfs_e_em_massa não encontrada ou falhou, usando fallback direto:', rpcError);
+        const { error: fallbackError } = await supabase
+          .from('ordens_servico')
+          .update({ nfs_e: nfsTrimmed })
+          .in('numero_os', selectedOSs);
+          
+        if (fallbackError) throw fallbackError;
+      }
       
       toast.success('NFS-e atribuída com sucesso para as OSs selecionadas!');
       setBulkNfsE('');
