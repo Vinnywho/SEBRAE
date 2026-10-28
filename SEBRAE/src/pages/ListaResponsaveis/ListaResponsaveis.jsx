@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { supabase } from '../../supabase';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../../context/ToastContext';
 import { 
   Search, User, FileText, CheckCircle, Clock, MinusCircle, 
-  Users, ChevronDown, ChevronRight, Calendar, ArrowRight 
+  Users, ChevronDown, ChevronRight, Calendar, ArrowRight,
+  CheckSquare, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import './ListaResponsaveis.css';
 
 const ListaResponsaveis = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [responsaveis, setResponsaveis] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
@@ -17,6 +20,15 @@ const ListaResponsaveis = () => {
   const [agruparPorPessoa, setAgruparPorPessoa] = useState(false);
   const [expandedPessoas, setExpandedPessoas] = useState({});
   const [isLoading, setIsLoading] = useState(true);
+
+  // Bulk Actions
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState('Pago');
+  const [bulkDataPagamento, setBulkDataPagamento] = useState(new Date().toISOString().split('T')[0]);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+  // Ordenação por Nº de OS
+  const [sortOrderOS, setSortOrderOS] = useState('none'); // 'none' | 'asc' | 'desc'
 
   useEffect(() => {
     fetchResponsaveis();
@@ -51,6 +63,14 @@ const ListaResponsaveis = () => {
     }));
   };
 
+  const toggleSortOS = () => {
+    setSortOrderOS(prev => {
+      if (prev === 'none') return 'asc';
+      if (prev === 'asc') return 'desc';
+      return 'none';
+    });
+  };
+
   // Filtro individual
   const filteredRecords = useMemo(() => {
     return responsaveis.filter(r => {
@@ -75,12 +95,23 @@ const ListaResponsaveis = () => {
     });
   }, [responsaveis, searchTerm, statusFilter, dataAgendamentoInicio, dataAgendamentoFim]);
 
+  // Lista ordenada por Nº OS (se selecionado)
+  const sortedFilteredRecords = useMemo(() => {
+    if (sortOrderOS === 'none') return filteredRecords;
+    return [...filteredRecords].sort((a, b) => {
+      const numA = (a.numero_os || '').toString();
+      const numB = (b.numero_os || '').toString();
+      const cmp = numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' });
+      return sortOrderOS === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredRecords, sortOrderOS]);
+
   // Agrupamento por Responsável
   const groupedData = useMemo(() => {
     if (!agruparPorPessoa) return [];
 
     const map = {};
-    filteredRecords.forEach(r => {
+    sortedFilteredRecords.forEach(r => {
       const nome = r.nome || 'Sem Nome';
       const total = getRecordTotal(r);
       const st = r.status_pagamento || 'Pendente';
@@ -117,12 +148,81 @@ const ListaResponsaveis = () => {
     return Object.values(map).map(p => {
       // Ordena agendamentos do mais recente ou futuro
       const sortedDates = [...p.agendamentos].sort();
+      // Ordena itens pela ordem do sortOrderOS se especificado
+      const sortedItens = sortOrderOS === 'none' ? p.itens : [...p.itens].sort((a, b) => {
+        const numA = (a.numero_os || '').toString();
+        const numB = (b.numero_os || '').toString();
+        const cmp = numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' });
+        return sortOrderOS === 'asc' ? cmp : -cmp;
+      });
+
       return {
         ...p,
+        itens: sortedItens,
         proximoAgendamento: sortedDates.length > 0 ? sortedDates[0] : null
       };
     });
-  }, [filteredRecords, agruparPorPessoa]);
+  }, [sortedFilteredRecords, agruparPorPessoa, sortOrderOS]);
+
+  // Bulk Actions Handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedIds(sortedFilteredRecords.map(r => r.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id, checked) => {
+    if (checked) {
+      setSelectedIds(prev => (prev.includes(id) ? prev : [...prev, id]));
+    } else {
+      setSelectedIds(prev => prev.filter(item => item !== id));
+    }
+  };
+
+  const handleSelectGroup = (itens, checked) => {
+    const groupIds = itens.map(i => i.id);
+    if (checked) {
+      setSelectedIds(prev => Array.from(new Set([...prev, ...groupIds])));
+    } else {
+      setSelectedIds(prev => prev.filter(id => !groupIds.includes(id)));
+    }
+  };
+
+  const aplicarBulkStatus = async () => {
+    if (selectedIds.length === 0) {
+      toast.warning('Selecione pelo menos um responsável para alterar o status.');
+      return;
+    }
+
+    setIsBulkUpdating(true);
+    try {
+      const updatePayload = {
+        status_pagamento: bulkStatus
+      };
+      if (bulkStatus === 'Pago') {
+        updatePayload.data_pagamento = bulkDataPagamento || new Date().toISOString().split('T')[0];
+      } else {
+        updatePayload.data_pagamento = null;
+      }
+
+      const { error } = await supabase
+        .from('os_responsaveis')
+        .update(updatePayload)
+        .in('id', selectedIds);
+
+      if (error) throw error;
+
+      toast.success(`Status "${bulkStatus}" atribuído com sucesso para ${selectedIds.length} ${selectedIds.length === 1 ? 'responsável' : 'responsáveis'}!`);
+      setSelectedIds([]);
+      await fetchResponsaveis();
+    } catch (err) {
+      toast.error('Erro ao atualizar status dos responsáveis: ' + err.message);
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
 
   const renderBadge = (status) => {
     const st = status || 'Pendente';
@@ -225,6 +325,55 @@ const ListaResponsaveis = () => {
           </div>
         </div>
 
+        {/* BARRA DE AÇÕES EM MASSA (Bulk Actions) */}
+        {selectedIds.length > 0 && (
+          <div className="bulk-actions-bar">
+            <span className="bulk-count">
+              {selectedIds.length} {selectedIds.length === 1 ? 'responsável selecionado' : 'responsáveis selecionados'}
+            </span>
+            <div className="bulk-controls">
+              <select 
+                value={bulkStatus} 
+                onChange={(e) => setBulkStatus(e.target.value)}
+                className="bulk-select"
+                title="Status para atribuir aos selecionados"
+              >
+                <option value="Pago">Pago</option>
+                <option value="Pendente">Pendente</option>
+                <option value="Não se aplica">Não se aplica</option>
+              </select>
+              {bulkStatus === 'Pago' && (
+                <div className="bulk-date-wrapper">
+                  <label>Data Pgto:</label>
+                  <input 
+                    type="date" 
+                    value={bulkDataPagamento} 
+                    onChange={(e) => setBulkDataPagamento(e.target.value)} 
+                    title="Data do pagamento"
+                  />
+                </div>
+              )}
+              <button 
+                type="button"
+                className="btn btn-primary" 
+                onClick={aplicarBulkStatus}
+                disabled={isBulkUpdating}
+              >
+                <CheckSquare size={16} />
+                {isBulkUpdating ? 'Atualizando...' : `Atribuir "${bulkStatus}"`}
+              </button>
+              <button 
+                type="button"
+                className="btn-clear-selection"
+                onClick={() => setSelectedIds([])}
+                title="Desmarcar todos"
+              >
+                Desmarcar
+              </button>
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div style={{ padding: '30px', textAlign: 'center' }}>Carregando pagamentos...</div>
         ) : agruparPorPessoa ? (
@@ -233,7 +382,15 @@ const ListaResponsaveis = () => {
             <table className="table data-table">
               <thead>
                 <tr>
-                  <th style={{ width: 40 }}></th>
+                  <th style={{ width: 40, textAlign: 'center' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={sortedFilteredRecords.length > 0 && sortedFilteredRecords.every(r => selectedIds.includes(r.id))} 
+                      onChange={handleSelectAll} 
+                      title="Selecionar todos os responsáveis"
+                    />
+                  </th>
+                  <th style={{ width: 30 }}></th>
                   <th>Responsável</th>
                   <th>Qtd. OSs</th>
                   <th>Total Geral</th>
@@ -245,14 +402,31 @@ const ListaResponsaveis = () => {
               <tbody>
                 {groupedData.length > 0 ? groupedData.map((p) => {
                   const isExpanded = !!expandedPessoas[p.nome];
+                  const groupSelectedCount = p.itens.filter(i => selectedIds.includes(i.id)).length;
+                  const isGroupAllSelected = p.itens.length > 0 && groupSelectedCount === p.itens.length;
+                  const isGroupIndeterminate = groupSelectedCount > 0 && !isGroupAllSelected;
+
                   return (
                     <Fragment key={p.nome}>
                       <tr 
                         onClick={() => toggleExpand(p.nome)} 
                         style={{ cursor: 'pointer', background: isExpanded ? '#f8fafc' : 'white' }}
-                        className="table-hover-row"
+                        className={`table-hover-row ${isGroupAllSelected ? 'selected-row' : ''}`}
                         title="Clique para expandir/recolher as OSs deste profissional"
                       >
+                        <td 
+                          className="row-checkbox" 
+                          style={{ textAlign: 'center' }} 
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={isGroupAllSelected}
+                            ref={el => { if (el) el.indeterminate = isGroupIndeterminate; }}
+                            onChange={(e) => handleSelectGroup(p.itens, e.target.checked)}
+                            title={isGroupAllSelected ? "Desmarcar todos deste responsável" : "Marcar todos deste responsável"}
+                          />
+                        </td>
                         <td style={{ textAlign: 'center', color: '#64748b' }}>
                           {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                         </td>
@@ -288,13 +462,25 @@ const ListaResponsaveis = () => {
                       {/* SUBTABELA EXPANDIDA */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan="7" style={{ padding: '0 15px 15px 15px', background: '#f8fafc' }}>
+                          <td colSpan="8" style={{ padding: '0 15px 15px 15px', background: '#f8fafc' }}>
                             <div className="grouped-subtable">
                               <h5>Ordens de Serviço de {p.nome}:</h5>
                               <table className="table" style={{ background: 'white', borderRadius: 6, overflow: 'hidden' }}>
                                 <thead>
                                   <tr style={{ background: '#f1f5f9', fontSize: 12 }}>
-                                    <th>Nº OS</th>
+                                    <th style={{ width: 40, textAlign: 'center' }}></th>
+                                    <th 
+                                      onClick={toggleSortOS} 
+                                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      title="Clique para ordenar por Nº OS (crescente/decrescente)"
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span>Nº OS</span>
+                                        {sortOrderOS === 'asc' && <ArrowUp size={13} color="#0084ff" />}
+                                        {sortOrderOS === 'desc' && <ArrowDown size={13} color="#0084ff" />}
+                                        {sortOrderOS === 'none' && <ArrowUpDown size={13} color="#9ca3af" />}
+                                      </div>
+                                    </th>
                                     <th>Freelance</th>
                                     <th>Condução</th>
                                     <th>Alimentação</th>
@@ -308,8 +494,24 @@ const ListaResponsaveis = () => {
                                 <tbody>
                                   {p.itens.map((sub, sIdx) => {
                                     const subTotal = getRecordTotal(sub);
+                                    const isSubSelected = selectedIds.includes(sub.id);
                                     return (
-                                      <tr key={sIdx} style={{ fontSize: 13 }}>
+                                      <tr 
+                                        key={sub.id || sIdx} 
+                                        style={{ fontSize: 13 }}
+                                        className={isSubSelected ? 'selected-row' : ''}
+                                      >
+                                        <td 
+                                          className="row-checkbox" 
+                                          style={{ textAlign: 'center' }} 
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <input 
+                                            type="checkbox" 
+                                            checked={isSubSelected} 
+                                            onChange={(e) => handleSelectOne(sub.id, e.target.checked)} 
+                                          />
+                                        </td>
                                         <td className="fw-bold">{sub.numero_os}</td>
                                         <td>R$ {(Number(sub.valor_freelance) || 0).toFixed(2).replace('.', ',')}</td>
                                         <td>R$ {(Number(sub.reembolso_conducao) || 0).toFixed(2).replace('.', ',')}</td>
@@ -341,7 +543,7 @@ const ListaResponsaveis = () => {
                   );
                 }) : (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '30px' }}>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '30px' }}>
                       Nenhum registro encontrado para os filtros selecionados.
                     </td>
                   </tr>
@@ -355,23 +557,55 @@ const ListaResponsaveis = () => {
             <table className="table data-table table-hover">
               <thead>
                 <tr>
+                  <th style={{ width: 40, textAlign: 'center' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={sortedFilteredRecords.length > 0 && selectedIds.length === sortedFilteredRecords.length} 
+                      onChange={handleSelectAll} 
+                      title="Selecionar todos"
+                    />
+                  </th>
                   <th>Responsável</th>
-                  <th>Nº OS</th>
+                  <th 
+                    onClick={toggleSortOS} 
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    title="Clique para ordenar por Nº OS (crescente/decrescente)"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Nº OS</span>
+                      {sortOrderOS === 'asc' && <ArrowUp size={14} color="#0084ff" />}
+                      {sortOrderOS === 'desc' && <ArrowDown size={14} color="#0084ff" />}
+                      {sortOrderOS === 'none' && <ArrowUpDown size={14} color="#9ca3af" />}
+                    </div>
+                  </th>
                   <th>Valor Total (R$)</th>
                   <th>Data Agendamento</th>
                   <th>Status do Pagamento</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRecords.length > 0 ? filteredRecords.map((r, i) => {
+                {sortedFilteredRecords.length > 0 ? sortedFilteredRecords.map((r) => {
                   const total = getRecordTotal(r);
+                  const isSelected = selectedIds.includes(r.id);
                   return (
                     <tr 
-                      key={i} 
+                      key={r.id} 
                       onClick={() => navigate(`/os-form?id=${r.numero_os}&view=true`)} 
                       style={{ cursor: 'pointer' }} 
                       title="Clique para visualizar a OS"
+                      className={isSelected ? 'selected-row' : ''}
                     >
+                      <td 
+                        className="row-checkbox" 
+                        style={{ textAlign: 'center' }} 
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected} 
+                          onChange={(e) => handleSelectOne(r.id, e.target.checked)} 
+                        />
+                      </td>
                       <td className="fw-bold">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <User size={16} className="text-muted" /> {r.nome}
@@ -389,7 +623,7 @@ const ListaResponsaveis = () => {
                   );
                 }) : (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '30px' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '30px' }}>
                       Nenhum pagamento encontrado com os filtros atuais.
                     </td>
                   </tr>

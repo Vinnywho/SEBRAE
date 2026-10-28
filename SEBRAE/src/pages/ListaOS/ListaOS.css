@@ -1,4 +1,4 @@
-﻿.lista-os-container {
+.lista-os-container {
   animation: fadeIn 0.3s ease-out;
 }
 
@@ -109,6 +109,11 @@
 
 .table-row-hover:hover {
   background-color: #f9fafb;
+}
+
+tr.selected-row,
+tr.selected-row td {
+  background-color: #f0fdf4 !important;
 }
 
 .recent-indicator {

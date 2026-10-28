@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../supabase';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '../../context/ConfigContext';
 import { useToast } from '../../context/ToastContext';
 import { isRecentlyEdited } from '../../utils/format';
-import { Edit2, Trash2, Search, Plus, Clock, FileText, Download, CheckSquare, Filter } from 'lucide-react';
+import { Edit2, Trash2, Search, Plus, Clock, FileText, Download, CheckSquare, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import './ListaOS.css';
 
 const ListaOS = () => {
@@ -16,6 +16,7 @@ const ListaOS = () => {
   const [dataFim, setDataFim] = useState('');
   const [filtroSemNfs, setFiltroSemNfs] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [sortOrderOS, setSortOrderOS] = useState('none'); // 'none' | 'asc' | 'desc'
   
   // Bulk Actions
   const [selectedOSs, setSelectedOSs] = useState([]);
@@ -93,9 +94,27 @@ const ListaOS = () => {
     return matchesSearch && matchesDate && matchesNfs;
   });
 
+  const toggleSortOS = () => {
+    setSortOrderOS(prev => {
+      if (prev === 'none') return 'asc';
+      if (prev === 'asc') return 'desc';
+      return 'none';
+    });
+  };
+
+  const sortedAndFilteredOS = useMemo(() => {
+    if (sortOrderOS === 'none') return filteredOS;
+    return [...filteredOS].sort((a, b) => {
+      const numA = (a.numero_os || '').toString();
+      const numB = (b.numero_os || '').toString();
+      const cmp = numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' });
+      return sortOrderOS === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredOS, sortOrderOS]);
+
   // Bulk Actions Handlers
   const handleSelectAll = (e) => {
-    if (e.target.checked) setSelectedOSs(filteredOS.map(o => o.numero_os));
+    if (e.target.checked) setSelectedOSs(sortedAndFilteredOS.map(o => o.numero_os));
     else setSelectedOSs([]);
   };
 
@@ -124,12 +143,12 @@ const ListaOS = () => {
   };
 
   const exportToCSV = async () => {
-    if (filteredOS.length === 0) return toast.warning('Não há dados para exportar com os filtros atuais.');
+    if (sortedAndFilteredOS.length === 0) return toast.warning('Não há dados para exportar com os filtros atuais.');
     
     setIsLoading(true);
     try {
       // Divide em lotes de 100 para não estourar o limite de URL da API do Supabase
-      const osNumbers = filteredOS.map(o => o.numero_os);
+      const osNumbers = sortedAndFilteredOS.map(o => o.numero_os);
       const detalhesPorOs = {};
       const responsaveisPorOs = {};
 
@@ -300,11 +319,22 @@ const ListaOS = () => {
                   <th style={{width: '40px', textAlign: 'center'}}>
                     <input 
                       type="checkbox" 
-                      checked={filteredOS.length > 0 && selectedOSs.length === filteredOS.length} 
+                      checked={sortedAndFilteredOS.length > 0 && selectedOSs.length === sortedAndFilteredOS.length} 
                       onChange={handleSelectAll} 
                     />
                   </th>
-                  <th>Nº OS</th>
+                  <th 
+                    onClick={toggleSortOS} 
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    title="Clique para ordenar por Nº OS (crescente/decrescente)"
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>Nº OS</span>
+                      {sortOrderOS === 'asc' && <ArrowUp size={14} color="#047857" />}
+                      {sortOrderOS === 'desc' && <ArrowDown size={14} color="#047857" />}
+                      {sortOrderOS === 'none' && <ArrowUpDown size={14} color="#9ca3af" />}
+                    </div>
+                  </th>
                   <th>Criação</th>
                   <th>Lote</th>
                   <th>Nome da OS</th>
@@ -316,7 +346,7 @@ const ListaOS = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredOS.length > 0 ? filteredOS.map((os) => {
+                {sortedAndFilteredOS.length > 0 ? sortedAndFilteredOS.map((os) => {
                   const recent = isRecentlyEdited(os.updated_at, diasEdicaoRecente);
                   return (
                     <tr 
