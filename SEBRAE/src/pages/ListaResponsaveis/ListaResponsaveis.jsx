@@ -6,16 +6,11 @@ import {
   Search, User, FileText, CheckCircle, Clock, MinusCircle, 
   Users, ChevronDown, ChevronRight, Calendar, ArrowRight,
   CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, Landmark,
-  CreditCard, Copy, Edit3, X, Save, AlertCircle, ExternalLink,
   DollarSign
 } from 'lucide-react';
 import { formatBRL, parseMonetary } from '../../utils/format';
-import { 
-  fetchCadastrosBancarios, 
-  saveCadastroBancario, 
-  formatDadosParaCopia,
-  BANCOS_COMUNS
-} from '../../services/bancarioService';
+import { fetchCadastrosBancarios } from '../../services/bancarioService';
+import ModalDadosBancarios from '../../components/ModalDadosBancarios/ModalDadosBancarios';
 import './ListaResponsaveis.css';
 
 const ListaResponsaveis = () => {
@@ -35,23 +30,6 @@ const ListaResponsaveis = () => {
   const [showBankModal, setShowBankModal] = useState(false);
   const [activeBankPerson, setActiveBankPerson] = useState('');
   const [isEditingBank, setIsEditingBank] = useState(false);
-  const [isSavingBank, setIsSavingBank] = useState(false);
-  const [copiedPix, setCopiedPix] = useState(false);
-  const [copiedAll, setCopiedAll] = useState(false);
-  const [bankFormData, setBankFormData] = useState({
-    nome: '',
-    cpf_cnpj: '',
-    banco: '',
-    agencia: '',
-    conta: '',
-    tipo_conta: 'Corrente',
-    tipo_chave_pix: 'Chave Aleatória',
-    chave_pix: '',
-    titular: '',
-    telefone: '',
-    email: '',
-    observacoes: ''
-  });
 
   // Bulk Actions
   const [selectedIds, setSelectedIds] = useState([]);
@@ -295,82 +273,9 @@ const ListaResponsaveis = () => {
 
   // Abertura do Modal de Dados Bancários
   const handleOpenBankModal = (nome, forceEdit = false) => {
-    setActiveBankPerson(nome);
-    const existing = cadastrosMap[nome.trim().toLowerCase()];
-
-    if (existing) {
-      setBankFormData({
-        nome: existing.nome || nome,
-        cpf_cnpj: existing.cpf_cnpj || '',
-        banco: existing.banco || '',
-        agencia: existing.agencia || '',
-        conta: existing.conta || '',
-        tipo_conta: existing.tipo_conta || 'Corrente',
-        tipo_chave_pix: existing.tipo_chave_pix || 'Chave Aleatória',
-        chave_pix: existing.chave_pix || '',
-        titular: existing.titular || '',
-        telefone: existing.telefone || '',
-        email: existing.email || '',
-        observacoes: existing.observacoes || ''
-      });
-      setIsEditingBank(forceEdit);
-    } else {
-      setBankFormData({
-        nome: nome,
-        cpf_cnpj: '',
-        banco: '',
-        agencia: '',
-        conta: '',
-        tipo_conta: 'Corrente',
-        tipo_chave_pix: 'Chave Aleatória',
-        chave_pix: '',
-        titular: nome,
-        telefone: '',
-        email: '',
-        observacoes: ''
-      });
-      setIsEditingBank(true);
-    }
+    setActiveBankPerson(nome || '');
+    setIsEditingBank(forceEdit);
     setShowBankModal(true);
-  };
-
-  const handleSaveBankData = async (e) => {
-    e?.preventDefault();
-    if (!bankFormData.nome || !bankFormData.nome.trim()) {
-      toast.error('O nome do responsável é obrigatório.');
-      return;
-    }
-
-    setIsSavingBank(true);
-    try {
-      await saveCadastroBancario(bankFormData);
-      await loadCadastrosBancarios();
-      toast.success(`Dados bancários de ${bankFormData.nome} salvos com sucesso!`);
-      setIsEditingBank(false);
-    } catch (err) {
-      toast.error('Erro ao salvar dados bancários: ' + err.message);
-    } finally {
-      setIsSavingBank(false);
-    }
-  };
-
-  const handleCopyPix = (chave) => {
-    if (!chave) {
-      toast.warning('Nenhuma chave PIX cadastrada para copiar.');
-      return;
-    }
-    navigator.clipboard.writeText(chave);
-    setCopiedPix(true);
-    setTimeout(() => setCopiedPix(false), 2000);
-    toast.success('Chave PIX copiada para a área de transferência!');
-  };
-
-  const handleCopyAllBankData = (data) => {
-    const formatted = formatDadosParaCopia(data);
-    navigator.clipboard.writeText(formatted);
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
-    toast.success('Todos os dados bancários copiados!');
   };
 
   const renderBadge = (status) => {
@@ -862,309 +767,17 @@ const ListaResponsaveis = () => {
       </div>
 
       {/* MODAL: CONFERIR E GERENCIAR DADOS BANCÁRIOS DO RESPONSÁVEL */}
-      {showBankModal && (
-        <div className="modal-overlay" onClick={() => setShowBankModal(false)}>
-          <div className="modal-content modal-banco-card" onClick={e => e.stopPropagation()}>
-            {/* CABEÇALHO ELEGANTE */}
-            <div className="modal-banco-header">
-              <div className="modal-banco-header-left">
-                <div className="banco-avatar-badge">
-                  <Landmark size={20} color="#0084ff" />
-                </div>
-                <div>
-                  <h3 className="modal-banco-title">Dados Bancários para Pagamento</h3>
-                  <div className="modal-banco-person-tag">
-                    <User size={13} />
-                    <span>{activeBankPerson}</span>
-                  </div>
-                </div>
-              </div>
-              <button 
-                type="button" 
-                className="btn-close-subtle" 
-                onClick={() => setShowBankModal(false)}
-                title="Fechar modal"
-              >
-                <X size={18}/>
-              </button>
-            </div>
-
-            <div className="modal-banco-body">
-              {!isEditingBank && (bankFormData.chave_pix || bankFormData.banco || bankFormData.conta) ? (
-                /* MODO VISUALIZAÇÃO / CONFERÊNCIA PREMIUM */
-                <div className="banco-view-wrap">
-                  {/* CARD DE DESTAQUE PIX */}
-                  <div className="pix-card-premium">
-                    <div className="pix-card-top">
-                      <div className="pix-chip">
-                        <span className="pix-pulse-dot"></span>
-                        <span>PIX • {bankFormData.tipo_chave_pix || 'Chave'}</span>
-                      </div>
-                      {bankFormData.chave_pix && (
-                        <button
-                          type="button"
-                          className={`btn-copy-pix-action ${copiedPix ? 'copied' : ''}`}
-                          onClick={() => handleCopyPix(bankFormData.chave_pix)}
-                          title="Copiar apenas a chave PIX"
-                        >
-                          {copiedPix ? (
-                            <>
-                              <CheckCircle size={14} />
-                              <span>Copiado!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={14} />
-                              <span>Copiar PIX</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
-                    <div className="pix-key-display" title={bankFormData.chave_pix}>
-                      {bankFormData.chave_pix || '(Chave PIX não cadastrada)'}
-                    </div>
-                  </div>
-
-                  {/* CARD DE DETALHES BANCÁRIOS */}
-                  <div className="bank-account-card">
-                    <div className="bank-card-section-title">
-                      <CreditCard size={15} color="#475569" />
-                      <span>Conta Bancária</span>
-                    </div>
-
-                    <div className="bank-specs-grid">
-                      <div className="bank-spec-box">
-                        <span className="spec-label">Banco</span>
-                        <span className="spec-value fw-bold">{bankFormData.banco || '(Não informado)'}</span>
-                      </div>
-                      <div className="bank-spec-box">
-                        <span className="spec-label">Tipo</span>
-                        <span className="spec-value">{bankFormData.tipo_conta || 'Conta Corrente'}</span>
-                      </div>
-                      <div className="bank-spec-box">
-                        <span className="spec-label">Agência</span>
-                        <span className="spec-value fw-bold">{bankFormData.agencia || '-'}</span>
-                      </div>
-                      <div className="bank-spec-box">
-                        <span className="spec-label">Conta</span>
-                        <span className="spec-value fw-bold">{bankFormData.conta || '-'}</span>
-                      </div>
-                      <div className="bank-spec-box span-full">
-                        <span className="spec-label">Titular da Conta</span>
-                        <span className="spec-value">{bankFormData.titular || bankFormData.nome}</span>
-                      </div>
-                      {bankFormData.cpf_cnpj && (
-                        <div className="bank-spec-box">
-                          <span className="spec-label">CPF / CNPJ</span>
-                          <span className="spec-value">{bankFormData.cpf_cnpj}</span>
-                        </div>
-                      )}
-                      {bankFormData.telefone && (
-                        <div className="bank-spec-box">
-                          <span className="spec-label">Contato / WhatsApp</span>
-                          <span className="spec-value">{bankFormData.telefone}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {bankFormData.observacoes && (
-                      <div className="bank-notes-banner">
-                        <strong>Obs:</strong> {bankFormData.observacoes}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* AÇÕES NO RODAPÉ */}
-                  <div className="modal-banco-footer">
-                    <button
-                      type="button"
-                      className={`btn-subtle-copy ${copiedAll ? 'copied' : ''}`}
-                      onClick={() => handleCopyAllBankData(bankFormData)}
-                    >
-                      {copiedAll ? <CheckCircle size={15} /> : <Copy size={15} />}
-                      <span>{copiedAll ? 'Copiado para área de transferência!' : 'Copiar Dados para Transferência'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-edit-bank"
-                      onClick={() => setIsEditingBank(true)}
-                    >
-                      <Edit3 size={15} />
-                      <span>Editar Dados</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* MODO CADASTRO / EDIÇÃO REFINADO */
-                <form onSubmit={handleSaveBankData} className="bank-form-refined">
-                  <div className="form-group mb-12">
-                    <label className="refined-label">Nome do Responsável:</label>
-                    <input 
-                      type="text" 
-                      className="refined-input"
-                      value={bankFormData.nome}
-                      onChange={(e) => setBankFormData({ ...bankFormData, nome: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-row-2 mb-12">
-                    <div className="form-group">
-                      <label className="refined-label">CPF ou CNPJ:</label>
-                      <input 
-                        type="text" 
-                        className="refined-input"
-                        placeholder="000.000.000-00"
-                        value={bankFormData.cpf_cnpj}
-                        onChange={(e) => setBankFormData({ ...bankFormData, cpf_cnpj: e.target.value })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="refined-label">Telefone / WhatsApp:</label>
-                      <input 
-                        type="text" 
-                        className="refined-input"
-                        placeholder="(00) 00000-0000"
-                        value={bankFormData.telefone}
-                        onChange={(e) => setBankFormData({ ...bankFormData, telefone: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-row-2 mb-12">
-                    <div className="form-group">
-                      <label className="refined-label">Banco:</label>
-                      <input 
-                        type="text" 
-                        className="refined-input"
-                        list="bancos-sugestoes"
-                        placeholder="Ex: Nubank, Banco do Brasil..."
-                        value={bankFormData.banco}
-                        onChange={(e) => setBankFormData({ ...bankFormData, banco: e.target.value })}
-                      />
-                      <datalist id="bancos-sugestoes">
-                        {BANCOS_COMUNS.map(b => (
-                          <option key={b} value={b} />
-                        ))}
-                      </datalist>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="refined-label">Tipo de Conta:</label>
-                      <select 
-                        className="refined-select"
-                        value={bankFormData.tipo_conta}
-                        onChange={(e) => setBankFormData({ ...bankFormData, tipo_conta: e.target.value })}
-                      >
-                        <option value="Corrente">Conta Corrente</option>
-                        <option value="Poupança">Conta Poupança</option>
-                        <option value="Pagamento">Conta Pagamento</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="form-row-2 mb-12">
-                    <div className="form-group">
-                      <label className="refined-label">Agência (com dígito):</label>
-                      <input 
-                        type="text" 
-                        className="refined-input"
-                        placeholder="0001"
-                        value={bankFormData.agencia}
-                        onChange={(e) => setBankFormData({ ...bankFormData, agencia: e.target.value })}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="refined-label">Conta com Dígito:</label>
-                      <input 
-                        type="text" 
-                        className="refined-input"
-                        placeholder="1234567-8"
-                        value={bankFormData.conta}
-                        onChange={(e) => setBankFormData({ ...bankFormData, conta: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* BLOCO PIX REFINADO */}
-                  <div className="refined-pix-fieldset">
-                    <span className="refined-pix-legend">Chave PIX</span>
-                    <div className="form-row-2" style={{ marginTop: 8 }}>
-                      <div className="form-group">
-                        <label className="refined-label">Tipo de Chave:</label>
-                        <select 
-                          className="refined-select"
-                          value={bankFormData.tipo_chave_pix}
-                          onChange={(e) => setBankFormData({ ...bankFormData, tipo_chave_pix: e.target.value })}
-                        >
-                          <option value="CPF/CNPJ">CPF / CNPJ</option>
-                          <option value="Celular">Celular / WhatsApp</option>
-                          <option value="E-mail">E-mail</option>
-                          <option value="Chave Aleatória">Chave Aleatória</option>
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label className="refined-label">Chave PIX:</label>
-                        <input 
-                          type="text" 
-                          className="refined-input"
-                          placeholder="Informe a chave PIX..."
-                          value={bankFormData.chave_pix}
-                          onChange={(e) => setBankFormData({ ...bankFormData, chave_pix: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="form-group mb-12">
-                    <label className="refined-label">Titular da Conta (se diferente):</label>
-                    <input 
-                      type="text" 
-                      className="refined-input"
-                      placeholder="Nome completo do favorecido"
-                      value={bankFormData.titular}
-                      onChange={(e) => setBankFormData({ ...bankFormData, titular: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-group mb-15">
-                    <label className="refined-label">Observações adicionais para pagamento:</label>
-                    <textarea 
-                      rows="2"
-                      className="refined-textarea"
-                      placeholder="Ex: Preferência chave celular; banco digital."
-                      value={bankFormData.observacoes}
-                      onChange={(e) => setBankFormData({ ...bankFormData, observacoes: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="modal-banco-edit-actions">
-                    {cadastrosMap[activeBankPerson.trim().toLowerCase()] && (
-                      <button 
-                        type="button" 
-                        className="btn-refined-cancel" 
-                        onClick={() => setIsEditingBank(false)}
-                      >
-                        Cancelar
-                      </button>
-                    )}
-                    <button 
-                      type="submit" 
-                      className="btn-refined-save"
-                      disabled={isSavingBank}
-                    >
-                      <Save size={16} />
-                      {isSavingBank ? 'Salvando...' : 'Salvar Dados Bancários'}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* MODAL DE DADOS BANCÁRIOS UNIFICADO */}
+      <ModalDadosBancarios 
+        isOpen={showBankModal}
+        onClose={() => setShowBankModal(false)}
+        responsavel={activeBankPerson}
+        initialData={cadastrosMap[activeBankPerson.trim().toLowerCase()] || null}
+        forceEdit={isEditingBank}
+        onSaveSuccess={async () => {
+          await loadCadastrosBancarios();
+        }}
+      />
     </div>
   );
 };

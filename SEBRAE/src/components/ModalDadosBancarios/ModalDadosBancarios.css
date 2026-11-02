@@ -1,0 +1,534 @@
+/* ========================================================
+   MODAL DADOS BANCÁRIOS - UNIFICADO, MODERNO E ESPAÇOSO
+   ======================================================== */
+
+.modal-banco-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+  animation: modalBancoFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalBancoFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-banco-dialog {
+  background: #ffffff;
+  width: 100%;
+  max-width: 600px;
+  max-height: 88vh;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalBancoSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalBancoSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ========================================================
+   CABEÇALHO
+   ======================================================== */
+.modal-banco-header {
+  padding: 22px 28px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.modal-banco-header-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.modal-banco-avatar-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-banco-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.modal-banco-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0084ff;
+  margin-top: 4px;
+}
+
+.modal-banco-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.modal-banco-close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* ========================================================
+   CORPO COM SCROLL GARANTIDO E MARGENS
+   ======================================================== */
+.modal-banco-body-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px 28px;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ========================================================
+   MODO VISUALIZAÇÃO: CARDS E ESPAÇAMENTOS
+   ======================================================== */
+.modal-banco-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Hero PIX */
+.banco-pix-hero-card {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border: 1.5px solid #a7f3d0;
+  border-radius: 12px;
+  padding: 18px 22px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
+}
+
+.banco-pix-hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.banco-pix-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #047857;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pix-indicator-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+
+.btn-pix-copy {
+  background: #ffffff;
+  border: 1px solid #86efac;
+  color: #047857;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-pix-copy:hover {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+.btn-pix-copy.copied {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+.banco-pix-key-val {
+  font-size: 17px;
+  font-weight: 700;
+  color: #064e3b;
+  font-family: 'SF Mono', Consolas, Monaco, monospace;
+  word-break: break-all;
+  user-select: all;
+  letter-spacing: 0.3px;
+  line-height: 1.4;
+}
+
+.text-empty {
+  font-size: 14px;
+  font-weight: normal;
+  color: #94a3b8;
+  font-style: italic;
+  font-family: inherit;
+}
+
+/* Card Conta Bancária */
+.banco-details-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.banco-card-label-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.banco-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 20px;
+}
+
+.banco-detail-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.banco-detail-cell.cell-full {
+  grid-column: 1 / -1;
+}
+
+.cell-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.cell-value {
+  font-size: 14px;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.cell-value.strong {
+  font-weight: 600;
+}
+
+/* Card de Informações Extras */
+.banco-extra-info-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.banco-extra-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.4;
+}
+
+.extra-icon {
+  color: #64748b;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ========================================================
+   MODO FORMULÁRIO / EDIÇÃO (MARGENS GENEROSAS)
+   ======================================================== */
+.modal-banco-form {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.form-section-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-section-caption {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.banco-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.banco-form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.banco-field-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.banco-field-input,
+.banco-field-select,
+.banco-field-textarea {
+  width: 100%;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: #0f172a;
+  background-color: #ffffff;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.banco-field-input:hover,
+.banco-field-select:hover,
+.banco-field-textarea:hover {
+  border-color: #94a3b8;
+}
+
+.banco-field-input:focus,
+.banco-field-select:focus,
+.banco-field-textarea:focus {
+  border-color: #0084ff;
+  box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.15);
+}
+
+.banco-pix-box-edit {
+  background: #f0fdf4;
+  border: 1.5px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.banco-pix-box-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #15803d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ========================================================
+   RODAPÉ ELEGANTE E FIXO
+   ======================================================== */
+.modal-banco-footer {
+  padding: 18px 28px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.btn-banco-copy-all {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-banco-copy-all:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-banco-copy-all.copied {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.btn-banco-edit-toggle {
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  color: #0084ff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-banco-edit-toggle:hover {
+  background: #0084ff;
+  border-color: #0084ff;
+  color: #ffffff;
+}
+
+.btn-banco-cancel {
+  background: transparent;
+  border: 1.5px solid #cbd5e1;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-banco-cancel:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.btn-banco-save-primary {
+  background: #0084ff;
+  border: none;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(0, 132, 255, 0.25);
+  transition: all 0.2s ease;
+  margin-left: auto;
+}
+
+.btn-banco-save-primary:hover:not(:disabled) {
+  background: #006bce;
+}
+
+.btn-banco-save-primary:disabled,
+.btn-banco-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ========================================================
+   RESPONSIVIDADE
+   ======================================================== */
+@media (max-width: 640px) {
+  .modal-banco-dialog {
+    max-height: 94vh;
+    border-radius: 12px;
+  }
+
+  .modal-banco-header,
+  .modal-banco-body-scroll,
+  .modal-banco-footer {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .banco-form-row-2,
+  .banco-details-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .modal-banco-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .btn-banco-save-primary,
+  .btn-banco-edit-toggle,
+  .btn-banco-copy-all,
+  .btn-banco-cancel {
+    width: 100%;
+    justify-content: center;
+  }
+}
