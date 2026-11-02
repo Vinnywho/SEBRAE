@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useEffect, useMemo, Fragment, useCallback } from 'react';
 import { supabase } from '../../supabase';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../context/ToastContext';
@@ -6,7 +6,7 @@ import {
   Search, User, FileText, CheckCircle, Clock, MinusCircle, 
   Users, ChevronDown, ChevronRight, Calendar, ArrowRight,
   CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, Landmark,
-  DollarSign
+  DollarSign, CreditCard
 } from 'lucide-react';
 import { formatBRL, parseMonetary } from '../../utils/format';
 import { fetchCadastrosBancarios } from '../../services/bancarioService';
@@ -40,12 +40,7 @@ const ListaResponsaveis = () => {
   // Ordenação por Nº de OS
   const [sortOrderOS, setSortOrderOS] = useState('none'); // 'none' | 'asc' | 'desc'
 
-  useEffect(() => {
-    fetchResponsaveis();
-    loadCadastrosBancarios();
-  }, []);
-
-  const fetchResponsaveis = async () => {
+  const fetchResponsaveis = useCallback(async () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('os_responsaveis')
@@ -59,16 +54,22 @@ const ListaResponsaveis = () => {
       setResponsaveis(data || []);
     }
     setIsLoading(false);
-  };
+  }, [toast]);
 
-  const loadCadastrosBancarios = async () => {
+  const loadCadastrosBancarios = useCallback(async () => {
     try {
       const data = await fetchCadastrosBancarios();
       setCadastrosBancarios(data || []);
     } catch (err) {
       console.error("Erro ao carregar dados bancários:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchResponsaveis();
+    loadCadastrosBancarios();
+  }, [fetchResponsaveis, loadCadastrosBancarios]);
 
   // Mapa de cadastros bancários por nome normalizado (lowercase)
   const cadastrosMap = useMemo(() => {
