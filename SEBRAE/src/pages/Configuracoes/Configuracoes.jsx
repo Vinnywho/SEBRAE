@@ -11,7 +11,8 @@ import {
 import { 
   fetchCadastrosBancarios, 
   saveCadastroBancario, 
-  deleteCadastroBancario 
+  deleteCadastroBancario,
+  BANCOS_COMUNS
 } from '../../services/bancarioService';
 import './Configuracoes.css';
 
@@ -1073,13 +1074,13 @@ const Configuracoes = () => {
 
         return (
           <div className="modal-overlay" onClick={() => setSelectedLog(null)}>
-            <div className="modal-content" style={{ maxWidth: 750, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-content" style={{ maxWidth: 780, width: '92vw', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden' }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
                 <h3>Detalhes da Auditoria #{selectedLog.id}</h3>
                 <button className="btn-close" onClick={() => setSelectedLog(null)}><X size={20}/></button>
               </div>
               <div className="modal-body" style={{ padding: 20 }}>
-                <div style={{ marginBottom: 15, fontSize: 13, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <div style={{ marginBottom: 15, fontSize: 13, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', wordBreak: 'break-word' }}>
                   <div><strong>Ação:</strong> <span className={`badge ${isCriacao ? 'success' : isEdicao ? 'warning' : 'danger'}`}>{selectedLog.acao}</span></div>
                   <div><strong>Entidade:</strong> <span className={`log-entity-tag ${selectedLog.entidade}`}>{selectedLog.entidade}</span> (#{selectedLog.registro_id})</div>
                   <div><strong>Data/Hora:</strong> {formatDateTime(selectedLog.created_at)}</div>
@@ -1219,9 +1220,9 @@ const Configuracoes = () => {
                   <summary style={{ fontSize: 13, fontWeight: 600, color: '#64748b', outline: 'none' }}>
                     Ver Snapshots Brutos (JSON Técnico)
                   </summary>
-                  <div style={{ marginTop: 12 }}>
+                  <div style={{ marginTop: 12, minWidth: 0, overflow: 'hidden' }}>
                     {selectedLog.dados_novos && (
-                      <div style={{ marginBottom: 12 }}>
+                      <div style={{ marginBottom: 12, minWidth: 0, overflow: 'hidden' }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: '#1e293b' }}>Dados Novos:</span>
                         <pre className="json-viewer" style={{ marginTop: 4 }}>
                           {JSON.stringify(selectedLog.dados_novos, null, 2)}
@@ -1229,7 +1230,7 @@ const Configuracoes = () => {
                       </div>
                     )}
                     {selectedLog.dados_antigos && (
-                      <div>
+                      <div style={{ minWidth: 0, overflow: 'hidden' }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Dados Anteriores:</span>
                         <pre className="json-viewer" style={{ opacity: 0.85, marginTop: 4 }}>
                           {JSON.stringify(selectedLog.dados_antigos, null, 2)}
@@ -1316,152 +1317,159 @@ const Configuracoes = () => {
       {/* MODAL RESPONSÁVEL / DADOS BANCÁRIOS */}
       {showRespModal && (
         <div className="modal-overlay" onClick={() => setShowRespModal(false)}>
-          <div className="modal-content" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{respFormData.nome ? `Dados Bancários: ${respFormData.nome}` : 'Cadastrar Responsável'}</h3>
+          <div className="modal-content" style={{ maxWidth: 620, width: '92vw', borderRadius: 12, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                {respFormData.nome ? `Dados Bancários: ${respFormData.nome}` : 'Cadastrar Responsável'}
+              </h3>
               <button className="btn-close" onClick={() => setShowRespModal(false)}><X size={20}/></button>
             </div>
-            <form onSubmit={handleSaveResp}>
-              <div className="modal-body" style={{ padding: '20px' }}>
-                <div className="form-group mb-12">
-                  <label className="fw-medium">Nome do Responsável / Profissional *</label>
+            <form onSubmit={handleSaveResp} className="bank-form-refined" style={{ padding: '20px' }}>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="refined-label">Nome do Responsável / Profissional *</label>
+                <input 
+                  type="text" 
+                  className="refined-input"
+                  placeholder="Nome completo..."
+                  value={respFormData.nome}
+                  onChange={(e) => setRespFormData({ ...respFormData, nome: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="form-row-2" style={{ marginBottom: 12 }}>
+                <div className="form-group">
+                  <label className="refined-label">CPF ou CNPJ</label>
                   <input 
                     type="text" 
-                    className="form-control"
-                    placeholder="Nome completo..."
-                    value={respFormData.nome}
-                    onChange={(e) => setRespFormData({ ...respFormData, nome: e.target.value })}
-                    required
+                    className="refined-input"
+                    placeholder="000.000.000-00"
+                    value={respFormData.cpf_cnpj}
+                    onChange={(e) => setRespFormData({ ...respFormData, cpf_cnpj: e.target.value })}
                   />
                 </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                  <div className="form-group">
-                    <label className="fw-medium">CPF ou CNPJ</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      placeholder="000.000.000-00"
-                      value={respFormData.cpf_cnpj}
-                      onChange={(e) => setRespFormData({ ...respFormData, cpf_cnpj: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="fw-medium">Telefone / WhatsApp</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      placeholder="(00) 00000-0000"
-                      value={respFormData.telefone}
-                      onChange={(e) => setRespFormData({ ...respFormData, telefone: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 12 }}>
-                  <div className="form-group">
-                    <label className="fw-medium">Banco</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      placeholder="Ex: Nubank, Banco do Brasil..."
-                      value={respFormData.banco}
-                      onChange={(e) => setRespFormData({ ...respFormData, banco: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="fw-medium">Tipo de Conta</label>
-                    <select 
-                      className="form-control"
-                      value={respFormData.tipo_conta}
-                      onChange={(e) => setRespFormData({ ...respFormData, tipo_conta: e.target.value })}
-                    >
-                      <option value="Corrente">Corrente</option>
-                      <option value="Poupança">Poupança</option>
-                      <option value="Pagamento">Pagamento</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginBottom: 12 }}>
-                  <div className="form-group">
-                    <label className="fw-medium">Agência (com dígito)</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      placeholder="0001"
-                      value={respFormData.agencia}
-                      onChange={(e) => setRespFormData({ ...respFormData, agencia: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="fw-medium">Conta com Dígito</label>
-                    <input 
-                      type="text" 
-                      className="form-control"
-                      placeholder="1234567-8"
-                      value={respFormData.conta}
-                      onChange={(e) => setRespFormData({ ...respFormData, conta: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#15803d', textTransform: 'uppercase' }}>
-                    Configuração PIX
-                  </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: 12, marginTop: 8 }}>
-                    <div className="form-group">
-                      <label className="fw-medium">Tipo da Chave</label>
-                      <select 
-                        className="form-control"
-                        value={respFormData.tipo_chave_pix}
-                        onChange={(e) => setRespFormData({ ...respFormData, tipo_chave_pix: e.target.value })}
-                      >
-                        <option value="CPF/CNPJ">CPF / CNPJ</option>
-                        <option value="Celular">Celular / Telefone</option>
-                        <option value="E-mail">E-mail</option>
-                        <option value="Chave Aleatória">Chave Aleatória</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="fw-medium">Chave PIX</label>
-                      <input 
-                        type="text" 
-                        className="form-control"
-                        placeholder="Informe a chave PIX..."
-                        value={respFormData.chave_pix}
-                        onChange={(e) => setRespFormData({ ...respFormData, chave_pix: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="form-group mb-12">
-                  <label className="fw-medium">Titular da Conta (se diferente)</label>
+                <div className="form-group">
+                  <label className="refined-label">Telefone / WhatsApp</label>
                   <input 
                     type="text" 
-                    className="form-control"
-                    placeholder="Nome completo do titular"
-                    value={respFormData.titular}
-                    onChange={(e) => setRespFormData({ ...respFormData, titular: e.target.value })}
-                  />
-                </div>
-
-                <div className="form-group mb-12">
-                  <label className="fw-medium">Observações para Pagamento</label>
-                  <textarea 
-                    rows="2"
-                    className="form-control"
-                    placeholder="Ex: Preferência chave celular."
-                    value={respFormData.observacoes}
-                    onChange={(e) => setRespFormData({ ...respFormData, observacoes: e.target.value })}
+                    className="refined-input"
+                    placeholder="(00) 00000-0000"
+                    value={respFormData.telefone}
+                    onChange={(e) => setRespFormData({ ...respFormData, telefone: e.target.value })}
                   />
                 </div>
               </div>
-              <div className="modal-footer" style={{ padding: '15px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                <button type="button" className="btn btn-outline" onClick={() => setShowRespModal(false)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={isSavingResp}>
+
+              <div className="form-row-2" style={{ marginBottom: 12 }}>
+                <div className="form-group">
+                  <label className="refined-label">Banco</label>
+                  <input 
+                    type="text" 
+                    className="refined-input"
+                    list="bancos-sugestoes-config"
+                    placeholder="Ex: Nubank, Banco do Brasil..."
+                    value={respFormData.banco}
+                    onChange={(e) => setRespFormData({ ...respFormData, banco: e.target.value })}
+                  />
+                  <datalist id="bancos-sugestoes-config">
+                    {BANCOS_COMUNS.map(b => (
+                      <option key={b} value={b} />
+                    ))}
+                  </datalist>
+                </div>
+                <div className="form-group">
+                  <label className="refined-label">Tipo de Conta</label>
+                  <select 
+                    className="refined-select"
+                    value={respFormData.tipo_conta}
+                    onChange={(e) => setRespFormData({ ...respFormData, tipo_conta: e.target.value })}
+                  >
+                    <option value="Corrente">Conta Corrente</option>
+                    <option value="Poupança">Conta Poupança</option>
+                    <option value="Pagamento">Conta Pagamento</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-row-2" style={{ marginBottom: 12 }}>
+                <div className="form-group">
+                  <label className="refined-label">Agência (com dígito)</label>
+                  <input 
+                    type="text" 
+                    className="refined-input"
+                    placeholder="0001"
+                    value={respFormData.agencia}
+                    onChange={(e) => setRespFormData({ ...respFormData, agencia: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="refined-label">Conta com Dígito</label>
+                  <input 
+                    type="text" 
+                    className="refined-input"
+                    placeholder="1234567-8"
+                    value={respFormData.conta}
+                    onChange={(e) => setRespFormData({ ...respFormData, conta: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="refined-pix-fieldset">
+                <span className="refined-pix-legend">
+                  Configuração PIX
+                </span>
+                <div className="form-row-2" style={{ marginTop: 8 }}>
+                  <div className="form-group">
+                    <label className="refined-label">Tipo da Chave</label>
+                    <select 
+                      className="refined-select"
+                      value={respFormData.tipo_chave_pix}
+                      onChange={(e) => setRespFormData({ ...respFormData, tipo_chave_pix: e.target.value })}
+                    >
+                      <option value="CPF/CNPJ">CPF / CNPJ</option>
+                      <option value="Celular">Celular / WhatsApp</option>
+                      <option value="E-mail">E-mail</option>
+                      <option value="Chave Aleatória">Chave Aleatória</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="refined-label">Chave PIX</label>
+                    <input 
+                      type="text" 
+                      className="refined-input"
+                      placeholder="Informe a chave PIX..."
+                      value={respFormData.chave_pix}
+                      onChange={(e) => setRespFormData({ ...respFormData, chave_pix: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="refined-label">Titular da Conta (se diferente)</label>
+                <input 
+                  type="text" 
+                  className="refined-input"
+                  placeholder="Nome completo do titular favorecido"
+                  value={respFormData.titular}
+                  onChange={(e) => setRespFormData({ ...respFormData, titular: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 15 }}>
+                <label className="refined-label">Observações para Pagamento</label>
+                <textarea 
+                  rows="2"
+                  className="refined-textarea"
+                  placeholder="Ex: Preferência chave celular."
+                  value={respFormData.observacoes}
+                  onChange={(e) => setRespFormData({ ...respFormData, observacoes: e.target.value })}
+                />
+              </div>
+
+              <div className="modal-banco-edit-actions">
+                <button type="button" className="btn-refined-cancel" onClick={() => setShowRespModal(false)}>Cancelar</button>
+                <button type="submit" className="btn-refined-save" disabled={isSavingResp}>
                   <Save size={16} /> {isSavingResp ? 'Salvando...' : 'Salvar Responsável'}
                 </button>
               </div>

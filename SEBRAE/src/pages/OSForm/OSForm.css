@@ -81,7 +81,7 @@
 }
 
 .input-group {
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: column; min-width: 0; width: 100%;
 }
 .input-group label {
   font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 8px;
@@ -94,6 +94,42 @@
   font-size: 14px;
   color: var(--text-main);
   transition: border 0.2s, box-shadow 0.2s;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Grids Específicos para Despesas do Responsável (Evita corte do campo Hospedagem) */
+.resp-despesas-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.resp-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1280px) {
+  .resp-despesas-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .resp-despesas-grid {
+    grid-template-columns: 1fr;
+  }
+  .resp-status-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .input-group input:focus, .input-group select:focus, .input-group textarea:focus {
   border-color: var(--primary-color);

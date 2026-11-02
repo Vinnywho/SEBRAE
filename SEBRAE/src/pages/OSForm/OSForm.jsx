@@ -529,13 +529,13 @@ const OSForm = () => {
                 
                 {activeRespTab && (
                   <div className="resp-content">
-                    <div className="grid-4 mb-15">
+                    <div className="resp-despesas-grid mb-15">
                       <div className="input-group"><label>Freelance (R$)</label><input type="number" step="any" name="valorFreelance" value={respData.valorFreelance} onChange={handleRespInput} disabled={isViewMode}/></div>
                       <div className="input-group"><label>Condução (R$)</label><input type="number" step="any" name="reembolsoConducao" value={respData.reembolsoConducao} onChange={handleRespInput} disabled={isViewMode}/></div>
                       <div className="input-group"><label>Alimentação (R$)</label><input type="number" step="any" name="reembolsoAlimentacao" value={respData.reembolsoAlimentacao} onChange={handleRespInput} disabled={isViewMode}/></div>
                       <div className="input-group"><label>Hospedagem (R$)</label><input type="number" step="any" name="reembolsoHospedagem" value={respData.reembolsoHospedagem} onChange={handleRespInput} disabled={isViewMode}/></div>
                     </div>
-                    <div className="grid-3">
+                    <div className="resp-status-grid">
                       <div className="input-group"><label>Agendamento</label><input type="date" name="agendamento" value={respData.agendamento} onChange={handleRespInput} disabled={isViewMode}/></div>
                       <div className="input-group">
                         <label>Status do Pagamento</label>

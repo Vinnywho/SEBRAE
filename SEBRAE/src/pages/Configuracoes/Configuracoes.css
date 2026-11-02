@@ -128,6 +128,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .log-entity-tag {
@@ -136,6 +138,7 @@
   padding: 2px 6px;
   border-radius: 4px;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 .log-entity-tag.os { background: #e0f2fe; color: #0284c7; }
 .log-entity-tag.lote { background: #fef3c7; color: #b45309; }
@@ -150,6 +153,9 @@
   font-size: 12px;
   overflow-x: auto;
   max-height: 350px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .diff-badge {
@@ -159,7 +165,8 @@
   padding: 2px 7px;
   border-radius: 4px;
   font-weight: 500;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .diff-table {
@@ -167,6 +174,7 @@
   border-collapse: collapse;
   margin-top: 10px;
   font-size: 13px;
+  table-layout: fixed;
 }
 
 .diff-table th {
@@ -176,11 +184,15 @@
   text-align: left;
   font-weight: 600;
   color: #475569;
+  word-break: break-word;
 }
 
 .diff-table td {
   padding: 8px 12px;
   border: 1px solid #e2e8f0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  vertical-align: top;
 }
 
 .diff-val-old {
@@ -189,7 +201,10 @@
   text-decoration: line-through;
   padding: 2px 6px;
   border-radius: 4px;
-  display: inline-block;
+  display: inline;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .diff-val-new {
@@ -198,5 +213,116 @@
   font-weight: 600;
   padding: 2px 6px;
   border-radius: 4px;
-  display: inline-block;
+  display: inline;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
+
+.config-table td {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Modal e Formulário Refinado de Responsáveis */
+.bank-form-refined {
+  display: flex;
+  flex-direction: column;
+}
+
+.refined-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.refined-input,
+.refined-select,
+.refined-textarea {
+  width: 100%;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #0f172a;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.refined-input:focus,
+.refined-select:focus,
+.refined-textarea:focus {
+  border-color: #0084ff;
+  box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.15);
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.refined-pix-fieldset {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.refined-pix-legend {
+  font-size: 11px;
+  font-weight: 700;
+  color: #15803d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal-banco-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn-refined-cancel {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-refined-cancel:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.btn-refined-save {
+  background: #0084ff;
+  color: #ffffff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background 0.2s ease;
+}
+
+.btn-refined-save:hover:not(:disabled) {
+  background: #006bce;
+}
+

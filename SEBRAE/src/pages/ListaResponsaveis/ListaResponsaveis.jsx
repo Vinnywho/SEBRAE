@@ -13,25 +13,10 @@ import { formatBRL, parseMonetary } from '../../utils/format';
 import { 
   fetchCadastrosBancarios, 
   saveCadastroBancario, 
-  formatDadosParaCopia 
+  formatDadosParaCopia,
+  BANCOS_COMUNS
 } from '../../services/bancarioService';
 import './ListaResponsaveis.css';
-
-const BANCOS_COMUNS = [
-  '001 - Banco do Brasil',
-  '260 - Nu Pagamentos (Nubank)',
-  '077 - Banco Inter',
-  '341 - Itaú Unibanco',
-  '237 - Banco Bradesco',
-  '104 - Caixa Econômica Federal',
-  '033 - Banco Santander',
-  '336 - Banco C6',
-  '290 - PagBank (PagSeguro)',
-  '748 - Banco Sicredi',
-  '756 - Bancoob (Sicoob)',
-  '380 - PicPay',
-  'Outro Banco'
-];
 
 const ListaResponsaveis = () => {
   const navigate = useNavigate();
@@ -51,6 +36,8 @@ const ListaResponsaveis = () => {
   const [activeBankPerson, setActiveBankPerson] = useState('');
   const [isEditingBank, setIsEditingBank] = useState(false);
   const [isSavingBank, setIsSavingBank] = useState(false);
+  const [copiedPix, setCopiedPix] = useState(false);
+  const [copiedAll, setCopiedAll] = useState(false);
   const [bankFormData, setBankFormData] = useState({
     nome: '',
     cpf_cnpj: '',
@@ -373,12 +360,16 @@ const ListaResponsaveis = () => {
       return;
     }
     navigator.clipboard.writeText(chave);
+    setCopiedPix(true);
+    setTimeout(() => setCopiedPix(false), 2000);
     toast.success('Chave PIX copiada para a área de transferência!');
   };
 
   const handleCopyAllBankData = (data) => {
     const formatted = formatDadosParaCopia(data);
     navigator.clipboard.writeText(formatted);
+    setCopiedAll(true);
+    setTimeout(() => setCopiedAll(false), 2000);
     toast.success('Todos os dados bancários copiados!');
   };
 
@@ -873,123 +864,167 @@ const ListaResponsaveis = () => {
       {/* MODAL: CONFERIR E GERENCIAR DADOS BANCÁRIOS DO RESPONSÁVEL */}
       {showBankModal && (
         <div className="modal-overlay" onClick={() => setShowBankModal(false)}>
-          <div className="modal-content modal-banco" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <h3>Informações Bancárias para Pagamento</h3>
-                <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: 13 }}>
-                  Profissional: <strong>{activeBankPerson}</strong>
-                </p>
+          <div className="modal-content modal-banco-card" onClick={e => e.stopPropagation()}>
+            {/* CABEÇALHO ELEGANTE */}
+            <div className="modal-banco-header">
+              <div className="modal-banco-header-left">
+                <div className="banco-avatar-badge">
+                  <Landmark size={20} color="#0084ff" />
+                </div>
+                <div>
+                  <h3 className="modal-banco-title">Dados Bancários para Pagamento</h3>
+                  <div className="modal-banco-person-tag">
+                    <User size={13} />
+                    <span>{activeBankPerson}</span>
+                  </div>
+                </div>
               </div>
-              <button className="btn-close" onClick={() => setShowBankModal(false)}><X size={20}/></button>
+              <button 
+                type="button" 
+                className="btn-close-subtle" 
+                onClick={() => setShowBankModal(false)}
+                title="Fechar modal"
+              >
+                <X size={18}/>
+              </button>
             </div>
 
-            <div className="modal-body">
+            <div className="modal-banco-body">
               {!isEditingBank && (bankFormData.chave_pix || bankFormData.banco || bankFormData.conta) ? (
-                /* MODO VISUALIZAÇÃO / CONFERÊNCIA */
-                <div className="bank-view-container">
-                  {/* Bloco Chave PIX */}
-                  <div className="pix-highlight-card">
-                    <div className="pix-header">
-                      <div className="pix-type-label">Chave PIX ({bankFormData.tipo_chave_pix || 'Chave'}):</div>
+                /* MODO VISUALIZAÇÃO / CONFERÊNCIA PREMIUM */
+                <div className="banco-view-wrap">
+                  {/* CARD DE DESTAQUE PIX */}
+                  <div className="pix-card-premium">
+                    <div className="pix-card-top">
+                      <div className="pix-chip">
+                        <span className="pix-pulse-dot"></span>
+                        <span>PIX • {bankFormData.tipo_chave_pix || 'Chave'}</span>
+                      </div>
                       {bankFormData.chave_pix && (
                         <button
                           type="button"
-                          className="btn-copy-pix"
+                          className={`btn-copy-pix-action ${copiedPix ? 'copied' : ''}`}
                           onClick={() => handleCopyPix(bankFormData.chave_pix)}
                           title="Copiar apenas a chave PIX"
                         >
-                          <Copy size={14} /> Copiar PIX
+                          {copiedPix ? (
+                            <>
+                              <CheckCircle size={14} />
+                              <span>Copiado!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={14} />
+                              <span>Copiar PIX</span>
+                            </>
+                          )}
                         </button>
                       )}
                     </div>
-                    <div className="pix-key-val">
-                      {bankFormData.chave_pix || '(Nenhuma chave cadastrada)'}
+                    <div className="pix-key-display" title={bankFormData.chave_pix}>
+                      {bankFormData.chave_pix || '(Chave PIX não cadastrada)'}
                     </div>
                   </div>
 
-                  {/* Detalhes Bancários da Conta */}
-                  <div className="bank-details-grid">
-                    <div className="bank-detail-item">
-                      <span className="lbl">Banco:</span>
-                      <span className="val fw-bold">{bankFormData.banco || '(Não informado)'}</span>
+                  {/* CARD DE DETALHES BANCÁRIOS */}
+                  <div className="bank-account-card">
+                    <div className="bank-card-section-title">
+                      <CreditCard size={15} color="#475569" />
+                      <span>Conta Bancária</span>
                     </div>
-                    <div className="bank-detail-item">
-                      <span className="lbl">Tipo de Conta:</span>
-                      <span className="val">{bankFormData.tipo_conta || 'Corrente'}</span>
+
+                    <div className="bank-specs-grid">
+                      <div className="bank-spec-box">
+                        <span className="spec-label">Banco</span>
+                        <span className="spec-value fw-bold">{bankFormData.banco || '(Não informado)'}</span>
+                      </div>
+                      <div className="bank-spec-box">
+                        <span className="spec-label">Tipo</span>
+                        <span className="spec-value">{bankFormData.tipo_conta || 'Conta Corrente'}</span>
+                      </div>
+                      <div className="bank-spec-box">
+                        <span className="spec-label">Agência</span>
+                        <span className="spec-value fw-bold">{bankFormData.agencia || '-'}</span>
+                      </div>
+                      <div className="bank-spec-box">
+                        <span className="spec-label">Conta</span>
+                        <span className="spec-value fw-bold">{bankFormData.conta || '-'}</span>
+                      </div>
+                      <div className="bank-spec-box span-full">
+                        <span className="spec-label">Titular da Conta</span>
+                        <span className="spec-value">{bankFormData.titular || bankFormData.nome}</span>
+                      </div>
+                      {bankFormData.cpf_cnpj && (
+                        <div className="bank-spec-box">
+                          <span className="spec-label">CPF / CNPJ</span>
+                          <span className="spec-value">{bankFormData.cpf_cnpj}</span>
+                        </div>
+                      )}
+                      {bankFormData.telefone && (
+                        <div className="bank-spec-box">
+                          <span className="spec-label">Contato / WhatsApp</span>
+                          <span className="spec-value">{bankFormData.telefone}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="bank-detail-item">
-                      <span className="lbl">Agência:</span>
-                      <span className="val fw-bold">{bankFormData.agencia || '-'}</span>
-                    </div>
-                    <div className="bank-detail-item">
-                      <span className="lbl">Conta com Dígito:</span>
-                      <span className="val fw-bold">{bankFormData.conta || '-'}</span>
-                    </div>
-                    <div className="bank-detail-item">
-                      <span className="lbl">Titular:</span>
-                      <span className="val">{bankFormData.titular || bankFormData.nome}</span>
-                    </div>
-                    <div className="bank-detail-item">
-                      <span className="lbl">CPF / CNPJ:</span>
-                      <span className="val">{bankFormData.cpf_cnpj || '(Não informado)'}</span>
-                    </div>
+
+                    {bankFormData.observacoes && (
+                      <div className="bank-notes-banner">
+                        <strong>Obs:</strong> {bankFormData.observacoes}
+                      </div>
+                    )}
                   </div>
 
-                  {bankFormData.observacoes && (
-                    <div className="bank-obs-box">
-                      <strong>Observações:</strong> {bankFormData.observacoes}
-                    </div>
-                  )}
-
-                  {/* Ações de Cópia e Edição */}
-                  <div className="bank-actions-footer">
+                  {/* AÇÕES NO RODAPÉ */}
+                  <div className="modal-banco-footer">
                     <button
                       type="button"
-                      className="btn btn-outline"
+                      className={`btn-subtle-copy ${copiedAll ? 'copied' : ''}`}
                       onClick={() => handleCopyAllBankData(bankFormData)}
                     >
-                      <Copy size={16} /> Copiar Todos os Dados
+                      {copiedAll ? <CheckCircle size={15} /> : <Copy size={15} />}
+                      <span>{copiedAll ? 'Copiado para área de transferência!' : 'Copiar Dados para Transferência'}</span>
                     </button>
                     <button
                       type="button"
-                      className="btn btn-primary"
+                      className="btn-edit-bank"
                       onClick={() => setIsEditingBank(true)}
                     >
-                      <Edit3 size={16} /> Editar Dados Bancários
+                      <Edit3 size={15} />
+                      <span>Editar Dados</span>
                     </button>
                   </div>
                 </div>
               ) : (
-                /* MODO CADASTRO / EDIÇÃO */
-                <form onSubmit={handleSaveBankData} className="bank-form">
+                /* MODO CADASTRO / EDIÇÃO REFINADO */
+                <form onSubmit={handleSaveBankData} className="bank-form-refined">
                   <div className="form-group mb-12">
-                    <label className="fw-medium">Nome do Responsável:</label>
+                    <label className="refined-label">Nome do Responsável:</label>
                     <input 
                       type="text" 
-                      className="form-control"
+                      className="refined-input"
                       value={bankFormData.nome}
                       onChange={(e) => setBankFormData({ ...bankFormData, nome: e.target.value })}
                       required
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-row-2 mb-12">
                     <div className="form-group">
-                      <label className="fw-medium">CPF ou CNPJ:</label>
+                      <label className="refined-label">CPF ou CNPJ:</label>
                       <input 
                         type="text" 
-                        className="form-control"
+                        className="refined-input"
                         placeholder="000.000.000-00"
                         value={bankFormData.cpf_cnpj}
                         onChange={(e) => setBankFormData({ ...bankFormData, cpf_cnpj: e.target.value })}
                       />
                     </div>
                     <div className="form-group">
-                      <label className="fw-medium">Telefone / WhatsApp:</label>
+                      <label className="refined-label">Telefone / WhatsApp:</label>
                       <input 
                         type="text" 
-                        className="form-control"
+                        className="refined-input"
                         placeholder="(00) 00000-0000"
                         value={bankFormData.telefone}
                         onChange={(e) => setBankFormData({ ...bankFormData, telefone: e.target.value })}
@@ -997,12 +1032,12 @@ const ListaResponsaveis = () => {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-row-2 mb-12">
                     <div className="form-group">
-                      <label className="fw-medium">Banco:</label>
+                      <label className="refined-label">Banco:</label>
                       <input 
                         type="text" 
-                        className="form-control"
+                        className="refined-input"
                         list="bancos-sugestoes"
                         placeholder="Ex: Nubank, Banco do Brasil..."
                         value={bankFormData.banco}
@@ -1016,35 +1051,35 @@ const ListaResponsaveis = () => {
                     </div>
 
                     <div className="form-group">
-                      <label className="fw-medium">Tipo de Conta:</label>
+                      <label className="refined-label">Tipo de Conta:</label>
                       <select 
-                        className="form-control"
+                        className="refined-select"
                         value={bankFormData.tipo_conta}
                         onChange={(e) => setBankFormData({ ...bankFormData, tipo_conta: e.target.value })}
                       >
-                        <option value="Corrente">Corrente</option>
-                        <option value="Poupança">Poupança</option>
-                        <option value="Pagamento">Pagamento</option>
+                        <option value="Corrente">Conta Corrente</option>
+                        <option value="Poupança">Conta Poupança</option>
+                        <option value="Pagamento">Conta Pagamento</option>
                       </select>
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-row-2 mb-12">
                     <div className="form-group">
-                      <label className="fw-medium">Agência (com dígito):</label>
+                      <label className="refined-label">Agência (com dígito):</label>
                       <input 
                         type="text" 
-                        className="form-control"
+                        className="refined-input"
                         placeholder="0001"
                         value={bankFormData.agencia}
                         onChange={(e) => setBankFormData({ ...bankFormData, agencia: e.target.value })}
                       />
                     </div>
                     <div className="form-group">
-                      <label className="fw-medium">Conta com Dígito:</label>
+                      <label className="refined-label">Conta com Dígito:</label>
                       <input 
                         type="text" 
-                        className="form-control"
+                        className="refined-input"
                         placeholder="1234567-8"
                         value={bankFormData.conta}
                         onChange={(e) => setBankFormData({ ...bankFormData, conta: e.target.value })}
@@ -1052,30 +1087,30 @@ const ListaResponsaveis = () => {
                     </div>
                   </div>
 
-                  {/* Bloco Chave PIX */}
-                  <div className="pix-edit-fieldset">
-                    <span className="fieldset-title">Configuração da Chave PIX</span>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: 12, marginTop: 8 }}>
+                  {/* BLOCO PIX REFINADO */}
+                  <div className="refined-pix-fieldset">
+                    <span className="refined-pix-legend">Chave PIX</span>
+                    <div className="form-row-2" style={{ marginTop: 8 }}>
                       <div className="form-group">
-                        <label className="fw-medium">Tipo da Chave:</label>
+                        <label className="refined-label">Tipo de Chave:</label>
                         <select 
-                          className="form-control"
+                          className="refined-select"
                           value={bankFormData.tipo_chave_pix}
                           onChange={(e) => setBankFormData({ ...bankFormData, tipo_chave_pix: e.target.value })}
                         >
                           <option value="CPF/CNPJ">CPF / CNPJ</option>
-                          <option value="Celular">Celular / Telefone</option>
+                          <option value="Celular">Celular / WhatsApp</option>
                           <option value="E-mail">E-mail</option>
                           <option value="Chave Aleatória">Chave Aleatória</option>
                         </select>
                       </div>
 
                       <div className="form-group">
-                        <label className="fw-medium">Chave PIX:</label>
+                        <label className="refined-label">Chave PIX:</label>
                         <input 
                           type="text" 
-                          className="form-control"
-                          placeholder="Informe a chave PIX exata..."
+                          className="refined-input"
+                          placeholder="Informe a chave PIX..."
                           value={bankFormData.chave_pix}
                           onChange={(e) => setBankFormData({ ...bankFormData, chave_pix: e.target.value })}
                         />
@@ -1084,32 +1119,32 @@ const ListaResponsaveis = () => {
                   </div>
 
                   <div className="form-group mb-12">
-                    <label className="fw-medium">Titular da Conta (se diferente do responsável):</label>
+                    <label className="refined-label">Titular da Conta (se diferente):</label>
                     <input 
                       type="text" 
-                      className="form-control"
-                      placeholder="Nome completo do titular da conta"
+                      className="refined-input"
+                      placeholder="Nome completo do favorecido"
                       value={bankFormData.titular}
                       onChange={(e) => setBankFormData({ ...bankFormData, titular: e.target.value })}
                     />
                   </div>
 
                   <div className="form-group mb-15">
-                    <label className="fw-medium">Observações adicionais para pagamento:</label>
+                    <label className="refined-label">Observações adicionais para pagamento:</label>
                     <textarea 
                       rows="2"
-                      className="form-control"
-                      placeholder="Ex: Preferência pagamento via PIX celular; banco digital."
+                      className="refined-textarea"
+                      placeholder="Ex: Preferência chave celular; banco digital."
                       value={bankFormData.observacoes}
                       onChange={(e) => setBankFormData({ ...bankFormData, observacoes: e.target.value })}
                     />
                   </div>
 
-                  <div className="modal-footer-edit">
+                  <div className="modal-banco-edit-actions">
                     {cadastrosMap[activeBankPerson.trim().toLowerCase()] && (
                       <button 
                         type="button" 
-                        className="btn btn-outline" 
+                        className="btn-refined-cancel" 
                         onClick={() => setIsEditingBank(false)}
                       >
                         Cancelar
@@ -1117,7 +1152,7 @@ const ListaResponsaveis = () => {
                     )}
                     <button 
                       type="submit" 
-                      className="btn btn-primary"
+                      className="btn-refined-save"
                       disabled={isSavingBank}
                     >
                       <Save size={16} />

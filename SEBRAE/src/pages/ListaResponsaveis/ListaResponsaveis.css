@@ -414,138 +414,389 @@ th input[type="checkbox"] {
   background: #e0f2fe;
 }
 
-/* Modal de Dados Bancários */
-.modal-banco {
-  max-width: 560px;
+/* ======================================================== */
+/* MODAL DE DADOS BANCÁRIOS - DESIGN PREMIUM E ELEGANTE */
+/* ======================================================== */
+.modal-banco-card {
+  max-width: 550px;
+  width: 92vw;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.bank-view-container {
+.modal-banco-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+}
+
+.modal-banco-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.banco-avatar-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-banco-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.2px;
+}
+
+.modal-banco-person-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #0084ff;
+  font-weight: 600;
+  margin-top: 3px;
+}
+
+.btn-close-subtle {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-close-subtle:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.modal-banco-body {
+  padding: 22px 24px;
+  overflow-y: auto;
+  max-height: 78vh;
+}
+
+.banco-view-wrap {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.pix-highlight-card {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  padding: 14px 16px;
+/* Card Destaque Chave PIX */
+.pix-card-premium {
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border: 1.5px solid #a7f3d0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
 }
 
-.pix-header {
+.pix-card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
-.pix-type-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #166534;
+.pix-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #047857;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.btn-copy-pix {
-  background: white;
+.pix-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
+.btn-copy-pix-action {
+  background: #ffffff;
   border: 1px solid #86efac;
-  color: #15803d;
+  color: #047857;
   font-size: 12px;
   font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  transition: all 0.2s;
+  gap: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
 }
 
-.btn-copy-pix:hover {
-  background: #dcfce7;
-  color: #14532d;
+.btn-copy-pix-action:hover {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
 }
 
-.pix-key-val {
+.btn-copy-pix-action.copied {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+.pix-key-display {
   font-size: 16px;
   font-weight: 700;
-  color: #14532d;
-  font-family: monospace;
+  color: #064e3b;
+  font-family: 'SF Mono', Consolas, Monaco, monospace;
   word-break: break-all;
+  user-select: all;
+  line-height: 1.4;
+  letter-spacing: 0.3px;
 }
 
-.bank-details-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  background: #f8fafc;
+/* Card Conta Bancária */
+.bank-account-card {
+  background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 14px;
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.bank-detail-item {
+.bank-card-section-title {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.bank-detail-item .lbl {
-  font-size: 11px;
-  color: #64748b;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
   text-transform: uppercase;
-  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
-.bank-detail-item .val {
-  font-size: 14px;
-  color: #1e293b;
+.bank-specs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
 }
 
-.bank-obs-box {
-  background: #fffbeb;
-  border: 1px solid #fef3c7;
-  border-radius: 6px;
-  padding: 10px 12px;
-  font-size: 13px;
-  color: #92400e;
-}
-
-.bank-actions-footer {
+.bank-spec-box {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #f1f5f9;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
 }
 
-/* Estilo do Formulário Bancário */
-.bank-form {
+.bank-spec-box.span-full {
+  grid-column: 1 / -1;
+}
+
+.spec-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.spec-value {
+  font-size: 14px;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.bank-notes-banner {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.4;
+}
+
+.modal-banco-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 18px;
+  flex-wrap: wrap;
+}
+
+.btn-subtle-copy {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.2s ease;
+}
+
+.btn-subtle-copy:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-subtle-copy.copied {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #047857;
+}
+
+.btn-edit-bank {
+  background: #0084ff;
+  color: #ffffff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.btn-edit-bank:hover {
+  background: #006bce;
+  transform: translateY(-1px);
+}
+
+/* Formulário de Edição Refinado */
+.bank-form-refined {
   display: flex;
   flex-direction: column;
 }
 
-.pix-edit-fieldset {
+.refined-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.refined-input,
+.refined-select,
+.refined-textarea {
+  width: 100%;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #0f172a;
+  background-color: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.refined-input:focus,
+.refined-select:focus,
+.refined-textarea:focus {
+  border-color: #0084ff;
+  box-shadow: 0 0 0 3px rgba(0, 132, 255, 0.15);
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.refined-pix-fieldset {
   background: #f0fdf4;
   border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 14px;
   margin-bottom: 12px;
 }
 
-.fieldset-title {
-  font-size: 12px;
+.refined-pix-legend {
+  font-size: 11px;
   font-weight: 700;
   color: #15803d;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.modal-footer-edit {
+.modal-banco-edit-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 14px;
+  padding-top: 16px;
   border-top: 1px solid #f1f5f9;
+}
+
+.btn-refined-cancel {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-refined-cancel:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.btn-refined-save {
+  background: #0084ff;
+  color: #ffffff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background 0.2s ease;
+}
+
+.btn-refined-save:hover:not(:disabled) {
+  background: #006bce;
 }

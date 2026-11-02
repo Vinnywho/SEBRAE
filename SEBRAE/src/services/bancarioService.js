@@ -3,6 +3,22 @@ import { supabase } from '../supabase';
 const STORAGE_KEY = 'sebrae_cadastros_bancarios';
 const CONFIG_KEY = 'cadastros_responsaveis_bancarios';
 
+export const BANCOS_COMUNS = [
+  '001 - Banco do Brasil',
+  '260 - Nu Pagamentos (Nubank)',
+  '077 - Banco Inter',
+  '341 - Itaú Unibanco',
+  '237 - Banco Bradesco',
+  '104 - Caixa Econômica Federal',
+  '033 - Banco Santander',
+  '336 - Banco C6',
+  '290 - PagBank (PagSeguro)',
+  '748 - Banco Sicredi',
+  '756 - Bancoob (Sicoob)',
+  '380 - PicPay',
+  'Outro Banco'
+];
+
 /**
  * Busca todos os cadastros bancários de responsáveis.
  * Tenta primeiro a tabela dedicada `responsaveis_cadastros`.
