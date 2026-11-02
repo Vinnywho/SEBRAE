@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase';
 import { useConfig } from '../../context/ConfigContext';
 import { useToast } from '../../context/ToastContext';
-import { getDayOfWeek } from '../../utils/format';
+import { getDayOfWeek, formatBRL } from '../../utils/format';
 import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit, Printer } from 'lucide-react';
 import sebraeLogo from '../../assets/img/sebrae.svg';
 import './OSForm.css';
@@ -431,7 +431,7 @@ const OSForm = () => {
                         <td className="fw-bold">{d.responsavel}<br/><span style={{fontWeight:'normal', fontSize:12, color:'#6b7280'}}>{d.servico}</span></td>
                         <td>{d.horarioGravacao||'-'}</td><td>{d.horarioSaida||'-'}</td>
                         <td><span className="badge info">{d.quantidadeDiarias}</span></td>
-                        <td>R$ {Number(d.valorUnitario).toFixed(2).replace('.',',')}</td>
+                        <td>{formatBRL(d.valorUnitario)}</td>
                         {!isViewMode && (
                           <td style={{textAlign:'right'}}>
                             <button type="button" className="action-btn" onClick={() => editDetalhe(i)}><Edit2 size={16}/></button>
@@ -475,7 +475,7 @@ const OSForm = () => {
                     >
                       <option value="">{formData.lote ? 'Selecione a tabela de preços...' : 'Selecione um Lote no Passo 1 primeiro'}</option>
                       {produtosLoteAtual.map(p => (
-                        <option key={p.id} value={p.id}>{p.nome} - {p.unidade} (R$ {p.valor.toFixed(2).replace('.',',')})</option>
+                        <option key={p.id} value={p.id}>{p.nome} - {p.unidade} ({formatBRL(p.valor)})</option>
                       ))}
                       {detalheInput.produtoId === 'legacy' && (
                         <option value="legacy">Item Antigo (Manter valor pré-calculado)</option>
@@ -582,15 +582,15 @@ const OSForm = () => {
           <h3>Resumo Financeiro</h3>
           
           <div className="summary-list">
-            <div className="summary-item"><span className="text-muted">Faturamento</span><span className="fw-bold">R$ {financeiro.faturamento.toFixed(2).replace('.',',')}</span></div>
-            <div className="summary-item"><span className="text-muted">Despesas Resp.</span><span>- R$ {financeiro.custoResponsaveis.toFixed(2).replace('.',',')}</span></div>
-            <div className="summary-item"><span className="text-muted">Imposto (ISS)</span><span>- R$ {financeiro.iss.toFixed(2).replace('.',',')}</span></div>
+            <div className="summary-item"><span className="text-muted">Faturamento</span><span className="fw-bold">{formatBRL(financeiro.faturamento)}</span></div>
+            <div className="summary-item"><span className="text-muted">Despesas Resp.</span><span>- {formatBRL(financeiro.custoResponsaveis)}</span></div>
+            <div className="summary-item"><span className="text-muted">Imposto (ISS)</span><span>- {formatBRL(financeiro.iss)}</span></div>
             
             <div className="summary-divider"></div>
             
             <div className={`summary-total ${financeiro.lucro >= 0 ? 'positive' : 'negative'}`}>
               <span>Lucro Previsto</span>
-              <span style={{fontSize:'22px', fontWeight:'bold'}}>R$ {financeiro.lucro.toFixed(2).replace('.',',')}</span>
+              <span style={{fontSize:'22px', fontWeight:'bold'}}>{formatBRL(financeiro.lucro)}</span>
             </div>
             
             <div className="summary-item mt-10" style={{alignItems:'center'}}>
@@ -681,7 +681,7 @@ const OSForm = () => {
                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.horarioSaida || '-'}</td>
                   <td style={{ padding: '6px 8px', textAlign: 'center' }}>{d.quantidadeDiarias}</td>
                   <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>
-                    R$ {Number(d.valorUnitario || 0).toFixed(2).replace('.', ',')}
+                    {formatBRL(d.valorUnitario)}
                   </td>
                 </tr>
               )) : (
@@ -716,11 +716,11 @@ const OSForm = () => {
                 return (
                   <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '6px 8px', fontWeight: 'bold' }}>{nome}</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>R$ {(Number(r.valorFreelance) || 0).toFixed(2).replace('.', ',')}</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>R$ {(Number(r.reembolsoConducao) || 0).toFixed(2).replace('.', ',')}</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>R$ {(Number(r.reembolsoAlimentacao) || 0).toFixed(2).replace('.', ',')}</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>R$ {(Number(r.reembolsoHospedagem) || 0).toFixed(2).replace('.', ',')}</td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>R$ {subTotal.toFixed(2).replace('.', ',')}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>{formatBRL(r.valorFreelance)}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>{formatBRL(r.reembolsoConducao)}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>{formatBRL(r.reembolsoAlimentacao)}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right' }}>{formatBRL(r.reembolsoHospedagem)}</td>
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 'bold' }}>{formatBRL(subTotal)}</td>
                     <td style={{ padding: '6px 8px', textAlign: 'center' }}>{r.agendamento ? r.agendamento.split('-').reverse().join('/') : '-'}</td>
                     <td style={{ padding: '6px 8px', textAlign: 'center' }}>{r.statusPagamento || 'Pendente'}</td>
                   </tr>
@@ -747,19 +747,19 @@ const OSForm = () => {
             </h4>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
               <span>Faturamento Total:</span>
-              <strong>R$ {financeiro.faturamento.toFixed(2).replace('.', ',')}</strong>
+              <strong>{formatBRL(financeiro.faturamento)}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4, color: '#dc2626' }}>
               <span>(-) Despesas da Equipe:</span>
-              <span>- R$ {financeiro.custoResponsaveis.toFixed(2).replace('.', ',')}</span>
+              <span>- {formatBRL(financeiro.custoResponsaveis)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6, color: '#dc2626' }}>
               <span>(-) Impostos (ISS {(aliquotaISS * 100).toFixed(2)}%):</span>
-              <span>- R$ {financeiro.iss.toFixed(2).replace('.', ',')}</span>
+              <span>- {formatBRL(financeiro.iss)}</span>
             </div>
             <div style={{ borderTop: '2px solid #cbd5e1', paddingTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 'bold', color: '#166534' }}>
               <span>Lucro Líquido Previsto:</span>
-              <span>R$ {financeiro.lucro.toFixed(2).replace('.', ',')} ({financeiro.margem.toFixed(1)}%)</span>
+              <span>{formatBRL(financeiro.lucro)} ({financeiro.margem.toFixed(1)}%)</span>
             </div>
           </div>
         </div>

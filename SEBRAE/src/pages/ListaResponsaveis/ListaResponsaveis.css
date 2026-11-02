@@ -313,3 +313,239 @@ th input[type="checkbox"] {
     justify-content: center;
   }
 }
+
+/* Bulk Selection Information with Real-time Sum */
+.bulk-selected-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.bulk-sum-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  color: #166534;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bulk-sum-badge strong {
+  font-size: 15px;
+  color: #14532d;
+}
+
+/* Badges e Botões de Dados Bancários na Tabela */
+.btn-bank-badge {
+  border: 1px solid #e2e8f0;
+  background: white;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-bank-badge.has-data {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0369a1;
+  font-weight: 500;
+}
+
+.btn-bank-badge.has-data:hover {
+  background: #e0f2fe;
+  border-color: #0284c7;
+}
+
+.btn-bank-badge.no-data {
+  background: #f8fafc;
+  color: #64748b;
+  border-style: dashed;
+}
+
+.btn-bank-badge.no-data:hover {
+  background: #f1f5f9;
+  color: #0084ff;
+  border-color: #0084ff;
+}
+
+.pix-tag {
+  background: #10b981;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.bank-name-text {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-link-bank {
+  background: transparent;
+  border: none;
+  color: #0284c7;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-link-bank:hover {
+  background: #e0f2fe;
+}
+
+/* Modal de Dados Bancários */
+.modal-banco {
+  max-width: 560px;
+}
+
+.bank-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pix-highlight-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.pix-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.pix-type-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #166534;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-copy-pix {
+  background: white;
+  border: 1px solid #86efac;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.btn-copy-pix:hover {
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.pix-key-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: #14532d;
+  font-family: monospace;
+  word-break: break-all;
+}
+
+.bank-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.bank-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bank-detail-item .lbl {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.bank-detail-item .val {
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.bank-obs-box {
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #92400e;
+}
+
+.bank-actions-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Estilo do Formulário Bancário */
+.bank-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.pix-edit-fieldset {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.fieldset-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #15803d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal-footer-edit {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+}

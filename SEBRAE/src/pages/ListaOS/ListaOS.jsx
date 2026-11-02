@@ -3,7 +3,7 @@ import { supabase } from '../../supabase';
 import { useNavigate } from 'react-router-dom';
 import { useConfig } from '../../context/ConfigContext';
 import { useToast } from '../../context/ToastContext';
-import { isRecentlyEdited } from '../../utils/format';
+import { isRecentlyEdited, formatBRL } from '../../utils/format';
 import { Edit2, Trash2, Search, Plus, Clock, FileText, Download, CheckSquare, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import './ListaOS.css';
 
@@ -388,7 +388,7 @@ const ListaOS = () => {
                       <td>{os.lote || '-'}</td>
                       <td className="fw-medium">{os.nome_os || os.endereco || '-'}</td>
                       <td>{os.cidade || '-'}</td>
-                      <td>R$ {Number(os.valor_unitario_total || 0).toFixed(2).replace('.', ',')}</td>
+                      <td className="fw-bold">{formatBRL(os.valor_unitario_total)}</td>
                       <td>
                         {os.nfs_e ? (
                           <span>{os.nfs_e}</span>

@@ -1,10 +1,11 @@
-﻿import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login/Login";
 import Layout from "./components/Layout/Layout";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import OSForm from "./pages/OSForm/OSForm";
 import ListaOS from "./pages/ListaOS/ListaOS";
 import ListaResponsaveis from './pages/ListaResponsaveis/ListaResponsaveis';
+import Relatorios from "./pages/Relatorios/Relatorios";
 import Configuracoes from "./pages/Configuracoes/Configuracoes";
 import ProtectedRoute from "./ProtectedRoute.jsx";
 import { ConfigProvider } from "./context/ConfigContext";
@@ -28,6 +29,7 @@ function App() {
             <Route path="/os-form" element={<OSForm />} />
             <Route path="/lista-os" element={<ListaOS />} />
             <Route path="/pagamentos" element={<ListaResponsaveis />} />
+            <Route path="/relatorios" element={<Relatorios />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>

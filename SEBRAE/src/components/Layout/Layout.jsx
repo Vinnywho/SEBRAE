@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "../../supabase";
 import logos from "../../assets/icons/logos.svg";
-import { Home, FileText, CalendarDays, Settings, LogOut, Menu, Plus } from "lucide-react";
+import { Home, FileText, CalendarDays, Settings, LogOut, Menu, Plus, FileSpreadsheet } from "lucide-react";
 import "./Layout.css";
 
 const Layout = () => {
@@ -53,6 +53,7 @@ const Layout = () => {
     { to: "/dashboard", icon: <Home size={20} />, label: "Dashboard" },
     { to: "/lista-os", icon: <FileText size={20} />, label: "Ordens de Serviço" },
     { to: "/pagamentos", icon: <CalendarDays size={20} />, label: "Pagamentos" },
+    { to: "/relatorios", icon: <FileSpreadsheet size={20} />, label: "Relatórios" },
     { to: "/configuracoes", icon: <Settings size={20} />, label: "Configurações" }
   ];
 

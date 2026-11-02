@@ -1,6 +1,27 @@
-﻿export const formatBRL = (value) => {
-  if (value === null || value === undefined || value === '') return 'R$ 0,00';
-  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+export const parseMonetary = (value) => {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return isNaN(value) ? 0 : value;
+  if (typeof value === 'string') {
+    let clean = value.replace(/[R$\s]/g, '').trim();
+    if (clean.includes(',') && clean.includes('.')) {
+      clean = clean.replace(/\./g, '').replace(',', '.');
+    } else if (clean.includes(',')) {
+      clean = clean.replace(',', '.');
+    }
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
+  }
+  return 0;
+};
+
+export const formatBRL = (value) => {
+  const num = parseMonetary(value);
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(num).replace(/\s+/g, ' ');
 };
 
 export const formatDate = (dateStr) => {

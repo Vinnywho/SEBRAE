@@ -1,4 +1,4 @@
-﻿.dashboard-container { max-width: 1200px; margin: 0 auto; }
+.dashboard-container { max-width: 1200px; margin: 0 auto; }
 .dash-header { margin-bottom: 30px; }
 .dash-header h2 { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
 
@@ -163,4 +163,158 @@
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header Actions & Period Selector */
+.dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.dash-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.period-selector-wrapper {
+  display: flex;
+  align-items: center;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 4px 12px;
+  gap: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.period-icon {
+  color: #0084ff;
+}
+
+.period-select {
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+
+.btn-fechar-mes {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+}
+
+.btn-icon-subtle {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon-subtle:hover {
+  color: #0084ff;
+  border-color: #0084ff;
+  background: #f0f7ff;
+}
+
+.period-badge-banner {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.period-empty-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #d97706;
+  font-weight: 500;
+}
+
+/* Modal Fechamento */
+.modal-fechamento {
+  max-width: 620px;
+}
+
+.fechamento-summary-box {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-lbl {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.summary-val {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.checkbox-option-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+  color: #166534;
+}
+
+@media (max-width: 768px) {
+  .dash-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dash-actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .period-selector-wrapper {
+    justify-content: center;
+  }
+  .btn-fechar-mes {
+    justify-content: center;
+  }
 }

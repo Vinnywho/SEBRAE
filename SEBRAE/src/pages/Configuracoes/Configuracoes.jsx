@@ -2,11 +2,17 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
 import { useConfig } from '../../context/ConfigContext';
 import { useToast } from '../../context/ToastContext';
-import { formatDateTime } from '../../utils/format';
+import { formatDateTime, formatBRL } from '../../utils/format';
 import { 
   Settings, RefreshCw, Archive, User, FileText, Edit2, Plus, X, 
-  Save, Trash2, Camera, Lock, Eye, KeyRound, CheckCircle2 
+  Save, Trash2, Camera, Lock, Eye, KeyRound, CheckCircle2,
+  Landmark, CreditCard
 } from 'lucide-react';
+import { 
+  fetchCadastrosBancarios, 
+  saveCadastroBancario, 
+  deleteCadastroBancario 
+} from '../../services/bancarioService';
 import './Configuracoes.css';
 
 const Configuracoes = () => {
@@ -42,6 +48,26 @@ const Configuracoes = () => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
+  // Equipe & Dados Bancários State
+  const [cadastrosEquipe, setCadastrosEquipe] = useState([]);
+  const [loadingEquipe, setLoadingEquipe] = useState(false);
+  const [showRespModal, setShowRespModal] = useState(false);
+  const [isSavingResp, setIsSavingResp] = useState(false);
+  const [respFormData, setRespFormData] = useState({
+    nome: '',
+    cpf_cnpj: '',
+    banco: '',
+    agencia: '',
+    conta: '',
+    tipo_conta: 'Corrente',
+    tipo_chave_pix: 'Chave Aleatória',
+    chave_pix: '',
+    titular: '',
+    telefone: '',
+    email: '',
+    observacoes: ''
+  });
+
   useEffect(() => {
     if (aliquotaISS !== undefined) {
       setIssInput((aliquotaISS * 100).toFixed(2));
@@ -58,7 +84,121 @@ const Configuracoes = () => {
     if (activeTab === 'conta') {
       fetchUserProfile();
     }
+    if (activeTab === 'equipe') {
+      loadEquipeCadastros();
+    }
   }, [activeTab]);
+
+  const loadEquipeCadastros = async () => {
+    setLoadingEquipe(true);
+    try {
+      const data = await fetchCadastrosBancarios();
+      setCadastrosEquipe(data || []);
+    } catch (err) {
+      toast.error('Erro ao carregar cadastros de equipe: ' + err.message);
+    } finally {
+      setLoadingEquipe(false);
+    }
+  };
+
+  const openNewRespModal = () => {
+    setRespFormData({
+      nome: '',
+      cpf_cnpj: '',
+      banco: '',
+      agencia: '',
+      conta: '',
+      tipo_conta: 'Corrente',
+      tipo_chave_pix: 'Chave Aleatória',
+      chave_pix: '',
+      titular: '',
+      telefone: '',
+      email: '',
+      observacoes: ''
+    });
+    setShowRespModal(true);
+  };
+
+  const openEditRespModal = (item) => {
+    setRespFormData({
+      nome: item.nome || '',
+      cpf_cnpj: item.cpf_cnpj || '',
+      banco: item.banco || '',
+      agencia: item.agencia || '',
+      conta: item.conta || '',
+      tipo_conta: item.tipo_conta || 'Corrente',
+      tipo_chave_pix: item.tipo_chave_pix || 'Chave Aleatória',
+      chave_pix: item.chave_pix || '',
+      titular: item.titular || '',
+      telefone: item.telefone || '',
+      email: item.email || '',
+      observacoes: item.observacoes || ''
+    });
+    setShowRespModal(true);
+  };
+
+  const handleSaveResp = async (e) => {
+    e?.preventDefault();
+    if (!respFormData.nome || !respFormData.nome.trim()) {
+      toast.error('O nome do responsável é obrigatório.');
+      return;
+    }
+    setIsSavingResp(true);
+    try {
+      await saveCadastroBancario(respFormData);
+      toast.success(`Dados bancários de "${respFormData.nome}" salvos com sucesso!`);
+      setShowRespModal(false);
+      await loadEquipeCadastros();
+    } catch (err) {
+      toast.error('Erro ao salvar dados bancários: ' + err.message);
+    } finally {
+      setIsSavingResp(false);
+    }
+  };
+
+  const handleDeleteResp = async (nome) => {
+    if (!confirm(`Deseja realmente remover os dados bancários de "${nome}"?`)) return;
+    try {
+      await deleteCadastroBancario(nome);
+      toast.success(`Cadastro de "${nome}" removido.`);
+      await loadEquipeCadastros();
+    } catch (err) {
+      toast.error('Erro ao remover cadastro: ' + err.message);
+    }
+  };
+
+  const detectarEquipeDasOS = async () => {
+    try {
+      const { data, error } = await supabase.from('os_responsaveis').select('nome');
+      if (error) throw error;
+      const existingNames = new Set(cadastrosEquipe.map(c => (c.nome || '').trim().toLowerCase()));
+      const novos = new Set();
+      (data || []).forEach(r => {
+        const n = (r.nome || '').trim();
+        if (n && !existingNames.has(n.toLowerCase())) {
+          novos.add(n);
+        }
+      });
+
+      if (novos.size === 0) {
+        toast.info('Todos os responsáveis encontrados nas OSs já estão cadastrados!');
+        return;
+      }
+
+      for (const nome of novos) {
+        await saveCadastroBancario({
+          nome,
+          tipo_conta: 'Corrente',
+          tipo_chave_pix: 'Chave Aleatória'
+        });
+      }
+
+      toast.success(`${novos.size} novo(s) responsável(is) detectado(s) e inserido(s) com sucesso!`);
+      await loadEquipeCadastros();
+    } catch (err) {
+      toast.error('Erro ao sincronizar responsáveis: ' + err.message);
+    }
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -139,7 +279,7 @@ const Configuracoes = () => {
     if (typeof val === 'boolean') return val ? 'Sim' : 'Não';
     if (typeof val === 'number') {
       if (key.includes('valor') || key.includes('curso') || key.includes('lucro') || key.includes('iss') || key.includes('adicionais')) {
-        return `R$ ${val.toFixed(2).replace('.', ',')}`;
+        return formatBRL(val);
       }
       if (key === 'aliquota_iss') {
         return `${(val * 100).toFixed(2)}%`;
@@ -519,6 +659,9 @@ const Configuracoes = () => {
         <button className={activeTab === 'lotes' ? 'active' : ''} onClick={() => setActiveTab('lotes')}>
           <Archive size={16} /> Lotes e Produtos
         </button>
+        <button className={activeTab === 'equipe' ? 'active' : ''} onClick={() => setActiveTab('equipe')}>
+          <Landmark size={16} /> Equipe & Dados Bancários
+        </button>
         <button className={activeTab === 'parametros' ? 'active' : ''} onClick={() => setActiveTab('parametros')}>
           <Settings size={16} /> Parâmetros globais
         </button>
@@ -569,6 +712,115 @@ const Configuracoes = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'equipe' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px', marginBottom: '20px' }}>
+              <div>
+                <h3>Equipe & Dados Bancários</h3>
+                <p className="text-muted" style={{ margin: '4px 0 0 0' }}>
+                  Gerencie as informações bancárias, chaves PIX, agências e contas de cada responsável/prestador de serviços.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <button type="button" className="btn-outline" onClick={detectarEquipeDasOS}>
+                  <RefreshCw size={14} /> Sincronizar das OSs
+                </button>
+                <button type="button" className="btn-primary" onClick={openNewRespModal}>
+                  <Plus size={16} /> Cadastrar Responsável
+                </button>
+              </div>
+            </div>
+
+            {loadingEquipe ? (
+              <div style={{ padding: '30px', textAlign: 'center' }}>Carregando dados da equipe...</div>
+            ) : cadastrosEquipe.length > 0 ? (
+              <div className="table-responsive">
+                <table className="table config-table">
+                  <thead>
+                    <tr>
+                      <th>Responsável</th>
+                      <th>CPF / CNPJ</th>
+                      <th>Banco</th>
+                      <th>Agência / Conta</th>
+                      <th>Chave PIX</th>
+                      <th>Titular</th>
+                      <th>Contato</th>
+                      <th style={{ textAlign: 'right' }}>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cadastrosEquipe.map((resp, idx) => (
+                      <tr key={resp.id || idx}>
+                        <td className="fw-bold">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <User size={16} className="text-muted" />
+                            {resp.nome}
+                          </div>
+                        </td>
+                        <td>{resp.cpf_cnpj || '-'}</td>
+                        <td>
+                          {resp.banco ? (
+                            <span style={{ fontWeight: 500, color: '#0369a1' }}>{resp.banco}</span>
+                          ) : '-'}
+                        </td>
+                        <td>
+                          {resp.agencia || resp.conta ? (
+                            <span>Ag: {resp.agencia || '-'} | Cc: {resp.conta || '-'} ({resp.tipo_conta || 'Corrente'})</span>
+                          ) : '-'}
+                        </td>
+                        <td>
+                          {resp.chave_pix ? (
+                            <span className="badge success" style={{ fontFamily: 'monospace', fontSize: 11 }}>
+                              {resp.tipo_chave_pix ? `[${resp.tipo_chave_pix}] ` : ''}{resp.chave_pix}
+                            </span>
+                          ) : '-'}
+                        </td>
+                        <td>{resp.titular || resp.nome || '-'}</td>
+                        <td>{resp.telefone || resp.email || '-'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button 
+                            type="button" 
+                            className="action-btn" 
+                            onClick={() => openEditRespModal(resp)}
+                            title="Editar dados bancários"
+                            style={{ marginRight: 6 }}
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            type="button" 
+                            className="action-btn delete" 
+                            onClick={() => handleDeleteResp(resp.nome)}
+                            title="Excluir responsável"
+                          >
+                            <Trash2 size={16} color="#ef4444" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{ padding: '40px', textAlign: 'center', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                <Landmark size={36} color="#94a3b8" style={{ marginBottom: 10 }} />
+                <h4 style={{ margin: '0 0 6px 0', color: '#1e293b' }}>Nenhum responsável com dados bancários cadastrado</h4>
+                <p className="text-muted" style={{ margin: 0, fontSize: 13 }}>
+                  Clique em "Sincronizar das OSs" para importar os nomes já utilizados nas Ordens de Serviço ou cadastre manualmente.
+                </p>
+                <div style={{ marginTop: 15, display: 'flex', gap: 10, justifyContent: 'center' }}>
+                  <button type="button" className="btn-outline" onClick={detectarEquipeDasOS}>
+                    Sincronizar das OSs
+                  </button>
+                  <button type="button" className="btn-primary" onClick={openNewRespModal}>
+                    <Plus size={16} /> Cadastrar Agora
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -917,7 +1169,7 @@ const Configuracoes = () => {
                               <td>{det.horario_gravacao || '-'}</td>
                               <td>{det.horario_saida || '-'}</td>
                               <td>{det.diarias || det.quantidade_diarias || 1}</td>
-                              <td>R$ {Number(det.valor_unitario || 0).toFixed(2).replace('.', ',')}</td>
+                              <td>{formatBRL(det.valor_unitario)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -947,7 +1199,7 @@ const Configuracoes = () => {
                             <tr key={i}>
                               <td className="fw-medium">{resp.nome || '-'}</td>
                               <td>{resp.funcao || '-'}</td>
-                              <td>R$ {Number(resp.valor_freelance || 0).toFixed(2).replace('.', ',')}</td>
+                              <td>{formatBRL(resp.valor_freelance)}</td>
                               <td>
                                 <span className={`badge ${resp.status_pagamento === 'Pago' ? 'success' : resp.status_pagamento === 'Não se aplica' ? 'info' : 'warning'}`}>
                                   {resp.status_pagamento || 'Pendente'}
@@ -1057,6 +1309,163 @@ const Configuracoes = () => {
                 <button type="button" className="btn-primary" onClick={handleSaveLote}><Save size={18}/> Salvar Lote Completo</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RESPONSÁVEL / DADOS BANCÁRIOS */}
+      {showRespModal && (
+        <div className="modal-overlay" onClick={() => setShowRespModal(false)}>
+          <div className="modal-content" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{respFormData.nome ? `Dados Bancários: ${respFormData.nome}` : 'Cadastrar Responsável'}</h3>
+              <button className="btn-close" onClick={() => setShowRespModal(false)}><X size={20}/></button>
+            </div>
+            <form onSubmit={handleSaveResp}>
+              <div className="modal-body" style={{ padding: '20px' }}>
+                <div className="form-group mb-12">
+                  <label className="fw-medium">Nome do Responsável / Profissional *</label>
+                  <input 
+                    type="text" 
+                    className="form-control"
+                    placeholder="Nome completo..."
+                    value={respFormData.nome}
+                    onChange={(e) => setRespFormData({ ...respFormData, nome: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group">
+                    <label className="fw-medium">CPF ou CNPJ</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="000.000.000-00"
+                      value={respFormData.cpf_cnpj}
+                      onChange={(e) => setRespFormData({ ...respFormData, cpf_cnpj: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="fw-medium">Telefone / WhatsApp</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="(00) 00000-0000"
+                      value={respFormData.telefone}
+                      onChange={(e) => setRespFormData({ ...respFormData, telefone: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group">
+                    <label className="fw-medium">Banco</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="Ex: Nubank, Banco do Brasil..."
+                      value={respFormData.banco}
+                      onChange={(e) => setRespFormData({ ...respFormData, banco: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="fw-medium">Tipo de Conta</label>
+                    <select 
+                      className="form-control"
+                      value={respFormData.tipo_conta}
+                      onChange={(e) => setRespFormData({ ...respFormData, tipo_conta: e.target.value })}
+                    >
+                      <option value="Corrente">Corrente</option>
+                      <option value="Poupança">Poupança</option>
+                      <option value="Pagamento">Pagamento</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginBottom: 12 }}>
+                  <div className="form-group">
+                    <label className="fw-medium">Agência (com dígito)</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="0001"
+                      value={respFormData.agencia}
+                      onChange={(e) => setRespFormData({ ...respFormData, agencia: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="fw-medium">Conta com Dígito</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="1234567-8"
+                      value={respFormData.conta}
+                      onChange={(e) => setRespFormData({ ...respFormData, conta: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#15803d', textTransform: 'uppercase' }}>
+                    Configuração PIX
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: 12, marginTop: 8 }}>
+                    <div className="form-group">
+                      <label className="fw-medium">Tipo da Chave</label>
+                      <select 
+                        className="form-control"
+                        value={respFormData.tipo_chave_pix}
+                        onChange={(e) => setRespFormData({ ...respFormData, tipo_chave_pix: e.target.value })}
+                      >
+                        <option value="CPF/CNPJ">CPF / CNPJ</option>
+                        <option value="Celular">Celular / Telefone</option>
+                        <option value="E-mail">E-mail</option>
+                        <option value="Chave Aleatória">Chave Aleatória</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label className="fw-medium">Chave PIX</label>
+                      <input 
+                        type="text" 
+                        className="form-control"
+                        placeholder="Informe a chave PIX..."
+                        value={respFormData.chave_pix}
+                        onChange={(e) => setRespFormData({ ...respFormData, chave_pix: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group mb-12">
+                  <label className="fw-medium">Titular da Conta (se diferente)</label>
+                  <input 
+                    type="text" 
+                    className="form-control"
+                    placeholder="Nome completo do titular"
+                    value={respFormData.titular}
+                    onChange={(e) => setRespFormData({ ...respFormData, titular: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group mb-12">
+                  <label className="fw-medium">Observações para Pagamento</label>
+                  <textarea 
+                    rows="2"
+                    className="form-control"
+                    placeholder="Ex: Preferência chave celular."
+                    value={respFormData.observacoes}
+                    onChange={(e) => setRespFormData({ ...respFormData, observacoes: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer" style={{ padding: '15px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowRespModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={isSavingResp}>
+                  <Save size={16} /> {isSavingResp ? 'Salvando...' : 'Salvar Responsável'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

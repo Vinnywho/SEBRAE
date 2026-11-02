@@ -5,9 +5,33 @@ import { useToast } from '../../context/ToastContext';
 import { 
   Search, User, FileText, CheckCircle, Clock, MinusCircle, 
   Users, ChevronDown, ChevronRight, Calendar, ArrowRight,
-  CheckSquare, ArrowUpDown, ArrowUp, ArrowDown
+  CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, Landmark,
+  CreditCard, Copy, Edit3, X, Save, AlertCircle, ExternalLink,
+  DollarSign
 } from 'lucide-react';
+import { formatBRL, parseMonetary } from '../../utils/format';
+import { 
+  fetchCadastrosBancarios, 
+  saveCadastroBancario, 
+  formatDadosParaCopia 
+} from '../../services/bancarioService';
 import './ListaResponsaveis.css';
+
+const BANCOS_COMUNS = [
+  '001 - Banco do Brasil',
+  '260 - Nu Pagamentos (Nubank)',
+  '077 - Banco Inter',
+  '341 - Itaú Unibanco',
+  '237 - Banco Bradesco',
+  '104 - Caixa Econômica Federal',
+  '033 - Banco Santander',
+  '336 - Banco C6',
+  '290 - PagBank (PagSeguro)',
+  '748 - Banco Sicredi',
+  '756 - Bancoob (Sicoob)',
+  '380 - PicPay',
+  'Outro Banco'
+];
 
 const ListaResponsaveis = () => {
   const navigate = useNavigate();
@@ -21,6 +45,27 @@ const ListaResponsaveis = () => {
   const [expandedPessoas, setExpandedPessoas] = useState({});
   const [isLoading, setIsLoading] = useState(true);
 
+  // Cadastros Bancários
+  const [cadastrosBancarios, setCadastrosBancarios] = useState([]);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [activeBankPerson, setActiveBankPerson] = useState('');
+  const [isEditingBank, setIsEditingBank] = useState(false);
+  const [isSavingBank, setIsSavingBank] = useState(false);
+  const [bankFormData, setBankFormData] = useState({
+    nome: '',
+    cpf_cnpj: '',
+    banco: '',
+    agencia: '',
+    conta: '',
+    tipo_conta: 'Corrente',
+    tipo_chave_pix: 'Chave Aleatória',
+    chave_pix: '',
+    titular: '',
+    telefone: '',
+    email: '',
+    observacoes: ''
+  });
+
   // Bulk Actions
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('Pago');
@@ -32,6 +77,7 @@ const ListaResponsaveis = () => {
 
   useEffect(() => {
     fetchResponsaveis();
+    loadCadastrosBancarios();
   }, []);
 
   const fetchResponsaveis = async () => {
@@ -43,18 +89,48 @@ const ListaResponsaveis = () => {
     
     if (error) {
       console.error("Erro ao buscar responsáveis:", error);
+      toast.error("Erro ao buscar registros de pagamentos");
     } else {
       setResponsaveis(data || []);
     }
     setIsLoading(false);
   };
 
-  const getRecordTotal = (r) => {
-    return (Number(r.valor_freelance) || 0) + 
-           (Number(r.reembolso_conducao) || 0) + 
-           (Number(r.reembolso_alimentacao) || 0) + 
-           (Number(r.reembolso_hospedagem) || 0);
+  const loadCadastrosBancarios = async () => {
+    try {
+      const data = await fetchCadastrosBancarios();
+      setCadastrosBancarios(data || []);
+    } catch (err) {
+      console.error("Erro ao carregar dados bancários:", err);
+    }
   };
+
+  // Mapa de cadastros bancários por nome normalizado (lowercase)
+  const cadastrosMap = useMemo(() => {
+    const map = {};
+    (cadastrosBancarios || []).forEach(c => {
+      if (c && c.nome) {
+        map[c.nome.trim().toLowerCase()] = c;
+      }
+    });
+    return map;
+  }, [cadastrosBancarios]);
+
+  const getRecordTotal = (r) => {
+    return (parseMonetary(r.valor_freelance)) + 
+           (parseMonetary(r.reembolso_conducao)) + 
+           (parseMonetary(r.reembolso_alimentacao)) + 
+           (parseMonetary(r.reembolso_hospedagem));
+  };
+
+  // Soma dos valores de todos os responsáveis selecionados
+  const selectedSum = useMemo(() => {
+    if (selectedIds.length === 0) return 0;
+    const selectedSet = new Set(selectedIds);
+    return responsaveis
+      .filter(r => selectedSet.has(r.id))
+      .reduce((acc, r) => acc + getRecordTotal(r), 0);
+  }, [selectedIds, responsaveis]);
 
   const toggleExpand = (nome) => {
     setExpandedPessoas(prev => ({
@@ -146,9 +222,7 @@ const ListaResponsaveis = () => {
     });
 
     return Object.values(map).map(p => {
-      // Ordena agendamentos do mais recente ou futuro
       const sortedDates = [...p.agendamentos].sort();
-      // Ordena itens pela ordem do sortOrderOS se especificado
       const sortedItens = sortOrderOS === 'none' ? p.itens : [...p.itens].sort((a, b) => {
         const numA = (a.numero_os || '').toString();
         const numB = (b.numero_os || '').toString();
@@ -200,16 +274,15 @@ const ListaResponsaveis = () => {
     try {
       const dataPgto = bulkStatus === 'Pago' ? (bulkDataPagamento || new Date().toISOString().split('T')[0]) : null;
 
-      // 1. Tentar executar via RPC para atualizar e gravar logs de auditoria completos
+      // 1. Tentar executar via RPC para auditoria completa
       const { error: rpcError } = await supabase.rpc('atualizar_status_responsaveis_em_massa', {
         p_ids: selectedIds,
         p_status: bulkStatus,
         p_data_pagamento: dataPgto
       });
 
-      // 2. Fallback caso a RPC ainda não tenha sido executada no banco
+      // 2. Fallback caso RPC ainda não exista no banco
       if (rpcError) {
-        console.warn('RPC atualizar_status_responsaveis_em_massa não encontrada ou falhou, usando fallback direto:', rpcError);
         const updatePayload = {
           status_pagamento: bulkStatus,
           data_pagamento: dataPgto
@@ -231,6 +304,82 @@ const ListaResponsaveis = () => {
     } finally {
       setIsBulkUpdating(false);
     }
+  };
+
+  // Abertura do Modal de Dados Bancários
+  const handleOpenBankModal = (nome, forceEdit = false) => {
+    setActiveBankPerson(nome);
+    const existing = cadastrosMap[nome.trim().toLowerCase()];
+
+    if (existing) {
+      setBankFormData({
+        nome: existing.nome || nome,
+        cpf_cnpj: existing.cpf_cnpj || '',
+        banco: existing.banco || '',
+        agencia: existing.agencia || '',
+        conta: existing.conta || '',
+        tipo_conta: existing.tipo_conta || 'Corrente',
+        tipo_chave_pix: existing.tipo_chave_pix || 'Chave Aleatória',
+        chave_pix: existing.chave_pix || '',
+        titular: existing.titular || '',
+        telefone: existing.telefone || '',
+        email: existing.email || '',
+        observacoes: existing.observacoes || ''
+      });
+      setIsEditingBank(forceEdit);
+    } else {
+      setBankFormData({
+        nome: nome,
+        cpf_cnpj: '',
+        banco: '',
+        agencia: '',
+        conta: '',
+        tipo_conta: 'Corrente',
+        tipo_chave_pix: 'Chave Aleatória',
+        chave_pix: '',
+        titular: nome,
+        telefone: '',
+        email: '',
+        observacoes: ''
+      });
+      setIsEditingBank(true);
+    }
+    setShowBankModal(true);
+  };
+
+  const handleSaveBankData = async (e) => {
+    e?.preventDefault();
+    if (!bankFormData.nome || !bankFormData.nome.trim()) {
+      toast.error('O nome do responsável é obrigatório.');
+      return;
+    }
+
+    setIsSavingBank(true);
+    try {
+      await saveCadastroBancario(bankFormData);
+      await loadCadastrosBancarios();
+      toast.success(`Dados bancários de ${bankFormData.nome} salvos com sucesso!`);
+      setIsEditingBank(false);
+    } catch (err) {
+      toast.error('Erro ao salvar dados bancários: ' + err.message);
+    } finally {
+      setIsSavingBank(false);
+    }
+  };
+
+  const handleCopyPix = (chave) => {
+    if (!chave) {
+      toast.warning('Nenhuma chave PIX cadastrada para copiar.');
+      return;
+    }
+    navigator.clipboard.writeText(chave);
+    toast.success('Chave PIX copiada para a área de transferência!');
+  };
+
+  const handleCopyAllBankData = (data) => {
+    const formatted = formatDadosParaCopia(data);
+    navigator.clipboard.writeText(formatted);
+    toast.success('Todos os dados bancários copiados!');
   };
 
   const renderBadge = (status) => {
@@ -261,7 +410,7 @@ const ListaResponsaveis = () => {
       <div className="lista-header">
         <div>
           <h2>Pagamentos da Equipe</h2>
-          <p className="text-muted">Acompanhe os valores a pagar para os responsáveis por OS ou consolidados por pessoa</p>
+          <p className="text-muted">Acompanhe os pagamentos da equipe por OS ou consolidados por pessoa e confira os dados bancários para transferências</p>
         </div>
       </div>
 
@@ -334,12 +483,19 @@ const ListaResponsaveis = () => {
           </div>
         </div>
 
-        {/* BARRA DE AÇÕES EM MASSA (Bulk Actions) */}
+        {/* BARRA DE AÇÕES EM MASSA (Bulk Actions) COM EXIBIÇÃO CLARA DA SOMA DOS SELECIONADOS */}
         {selectedIds.length > 0 && (
           <div className="bulk-actions-bar">
-            <span className="bulk-count">
-              {selectedIds.length} {selectedIds.length === 1 ? 'responsável selecionado' : 'responsáveis selecionados'}
-            </span>
+            <div className="bulk-selected-info">
+              <span className="bulk-count">
+                {selectedIds.length} {selectedIds.length === 1 ? 'responsável selecionado' : 'responsáveis selecionados'}
+              </span>
+              <span className="bulk-sum-badge">
+                <DollarSign size={16} color="#166534" />
+                Soma Selecionada: <strong>{formatBRL(selectedSum)}</strong>
+              </span>
+            </div>
+
             <div className="bulk-controls">
               <select 
                 value={bulkStatus} 
@@ -401,6 +557,7 @@ const ListaResponsaveis = () => {
                   </th>
                   <th style={{ width: 30 }}></th>
                   <th>Responsável</th>
+                  <th>Dados Bancários / PIX</th>
                   <th>Qtd. OSs</th>
                   <th>Total Geral</th>
                   <th>Já Pago</th>
@@ -414,6 +571,7 @@ const ListaResponsaveis = () => {
                   const groupSelectedCount = p.itens.filter(i => selectedIds.includes(i.id)).length;
                   const isGroupAllSelected = p.itens.length > 0 && groupSelectedCount === p.itens.length;
                   const isGroupIndeterminate = groupSelectedCount > 0 && !isGroupAllSelected;
+                  const bankData = cadastrosMap[p.nome.trim().toLowerCase()];
 
                   return (
                     <Fragment key={p.nome}>
@@ -445,15 +603,46 @@ const ListaResponsaveis = () => {
                             {p.nome}
                           </div>
                         </td>
+
+                        {/* COLUNA DADOS BANCÁRIOS / PIX */}
+                        <td onClick={(e) => e.stopPropagation()}>
+                          {bankData && (bankData.chave_pix || bankData.banco) ? (
+                            <button
+                              type="button"
+                              className="btn-bank-badge has-data"
+                              onClick={() => handleOpenBankModal(p.nome)}
+                              title="Clique para conferir dados bancários / copiar PIX"
+                            >
+                              <Landmark size={14} color="#0284c7" />
+                              <span className="bank-name-text">
+                                {bankData.banco ? bankData.banco.split('-')[1]?.trim() || bankData.banco : 'Banco'}
+                              </span>
+                              {bankData.chave_pix && (
+                                <span className="pix-tag">PIX</span>
+                              )}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-bank-badge no-data"
+                              onClick={() => handleOpenBankModal(p.nome, true)}
+                              title="Cadastrar informações bancárias deste profissional"
+                            >
+                              <CreditCard size={14} color="#94a3b8" />
+                              <span>+ Dados Bancários</span>
+                            </button>
+                          )}
+                        </td>
+
                         <td>
                           <span className="badge info">{p.osCount} {p.osCount === 1 ? 'OS' : 'OSs'}</span>
                         </td>
-                        <td className="fw-bold">R$ {p.totalGeral.toFixed(2).replace('.', ',')}</td>
+                        <td className="fw-bold">{formatBRL(p.totalGeral)}</td>
                         <td style={{ color: '#10b981', fontWeight: 600 }}>
-                          R$ {p.totalPago.toFixed(2).replace('.', ',')}
+                          {formatBRL(p.totalPago)}
                         </td>
                         <td style={{ color: p.totalPendente > 0 ? '#ef4444' : '#64748b', fontWeight: 600 }}>
-                          R$ {p.totalPendente.toFixed(2).replace('.', ',')}
+                          {formatBRL(p.totalPendente)}
                         </td>
                         <td>
                           {p.proximoAgendamento ? (
@@ -471,9 +660,18 @@ const ListaResponsaveis = () => {
                       {/* SUBTABELA EXPANDIDA */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan="8" style={{ padding: '0 15px 15px 15px', background: '#f8fafc' }}>
+                          <td colSpan="9" style={{ padding: '0 15px 15px 15px', background: '#f8fafc' }}>
                             <div className="grouped-subtable">
-                              <h5>Ordens de Serviço de {p.nome}:</h5>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <h5 style={{ margin: 0 }}>Ordens de Serviço de {p.nome}:</h5>
+                                <button
+                                  type="button"
+                                  className="btn-link-bank"
+                                  onClick={() => handleOpenBankModal(p.nome)}
+                                >
+                                  <Landmark size={14} /> Conferir Dados Bancários de {p.nome}
+                                </button>
+                              </div>
                               <table className="table" style={{ background: 'white', borderRadius: 6, overflow: 'hidden' }}>
                                 <thead>
                                   <tr style={{ background: '#f1f5f9', fontSize: 12 }}>
@@ -522,11 +720,11 @@ const ListaResponsaveis = () => {
                                           />
                                         </td>
                                         <td className="fw-bold">{sub.numero_os}</td>
-                                        <td>R$ {(Number(sub.valor_freelance) || 0).toFixed(2).replace('.', ',')}</td>
-                                        <td>R$ {(Number(sub.reembolso_conducao) || 0).toFixed(2).replace('.', ',')}</td>
-                                        <td>R$ {(Number(sub.reembolso_alimentacao) || 0).toFixed(2).replace('.', ',')}</td>
-                                        <td>R$ {(Number(sub.reembolso_hospedagem) || 0).toFixed(2).replace('.', ',')}</td>
-                                        <td className="fw-bold">R$ {subTotal.toFixed(2).replace('.', ',')}</td>
+                                        <td>{formatBRL(sub.valor_freelance)}</td>
+                                        <td>{formatBRL(sub.reembolso_conducao)}</td>
+                                        <td>{formatBRL(sub.reembolso_alimentacao)}</td>
+                                        <td>{formatBRL(sub.reembolso_hospedagem)}</td>
+                                        <td className="fw-bold">{formatBRL(subTotal)}</td>
                                         <td>{sub.agendamento && typeof sub.agendamento === 'string' && sub.agendamento.includes('-') ? sub.agendamento.split('-').reverse().join('/') : (sub.agendamento || '-')}</td>
                                         <td>{renderBadge(sub.status_pagamento)}</td>
                                         <td style={{ textAlign: 'right' }}>
@@ -552,7 +750,7 @@ const ListaResponsaveis = () => {
                   );
                 }) : (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '30px' }}>
+                    <td colSpan="9" style={{ textAlign: 'center', padding: '30px' }}>
                       Nenhum registro encontrado para os filtros selecionados.
                     </td>
                   </tr>
@@ -575,6 +773,7 @@ const ListaResponsaveis = () => {
                     />
                   </th>
                   <th>Responsável</th>
+                  <th>Dados Bancários</th>
                   <th 
                     onClick={toggleSortOS} 
                     style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -587,7 +786,7 @@ const ListaResponsaveis = () => {
                       {sortOrderOS === 'none' && <ArrowUpDown size={14} color="#9ca3af" />}
                     </div>
                   </th>
-                  <th>Valor Total (R$)</th>
+                  <th>Valor Total</th>
                   <th>Data Agendamento</th>
                   <th>Status do Pagamento</th>
                 </tr>
@@ -596,6 +795,8 @@ const ListaResponsaveis = () => {
                 {sortedFilteredRecords.length > 0 ? sortedFilteredRecords.map((r) => {
                   const total = getRecordTotal(r);
                   const isSelected = selectedIds.includes(r.id);
+                  const bankData = cadastrosMap[(r.nome || '').trim().toLowerCase()];
+
                   return (
                     <tr 
                       key={r.id} 
@@ -620,19 +821,45 @@ const ListaResponsaveis = () => {
                           <User size={16} className="text-muted" /> {r.nome}
                         </div>
                       </td>
+
+                      {/* Botão de Dados Bancários na linha individual */}
+                      <td onClick={(e) => e.stopPropagation()}>
+                        {bankData && (bankData.chave_pix || bankData.banco) ? (
+                          <button
+                            type="button"
+                            className="btn-bank-badge has-data"
+                            onClick={() => handleOpenBankModal(r.nome)}
+                            title="Conferir dados bancários / copiar chave PIX"
+                          >
+                            <Landmark size={14} color="#0284c7" />
+                            <span>{bankData.banco ? bankData.banco.split('-')[1]?.trim() || bankData.banco : 'PIX'}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-bank-badge no-data"
+                            onClick={() => handleOpenBankModal(r.nome, true)}
+                            title="Cadastrar dados bancários"
+                          >
+                            <CreditCard size={14} color="#94a3b8" />
+                            <span>+ Cadastrar</span>
+                          </button>
+                        )}
+                      </td>
+
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <FileText size={16} className="text-muted" /> {r.numero_os}
                         </div>
                       </td>
-                      <td>R$ {total.toFixed(2).replace('.', ',')}</td>
+                      <td className="fw-bold">{formatBRL(total)}</td>
                       <td>{r.agendamento ? r.agendamento.split('-').reverse().join('/') : '-'}</td>
                       <td>{renderBadge(r.status_pagamento)}</td>
                     </tr>
                   );
                 }) : (
                   <tr>
-                    <td colSpan="6" style={{ textAlign: 'center', padding: '30px' }}>
+                    <td colSpan="7" style={{ textAlign: 'center', padding: '30px' }}>
                       Nenhum pagamento encontrado com os filtros atuais.
                     </td>
                   </tr>
@@ -642,6 +869,267 @@ const ListaResponsaveis = () => {
           </div>
         )}
       </div>
+
+      {/* MODAL: CONFERIR E GERENCIAR DADOS BANCÁRIOS DO RESPONSÁVEL */}
+      {showBankModal && (
+        <div className="modal-overlay" onClick={() => setShowBankModal(false)}>
+          <div className="modal-content modal-banco" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>Informações Bancárias para Pagamento</h3>
+                <p className="text-muted" style={{ margin: '2px 0 0 0', fontSize: 13 }}>
+                  Profissional: <strong>{activeBankPerson}</strong>
+                </p>
+              </div>
+              <button className="btn-close" onClick={() => setShowBankModal(false)}><X size={20}/></button>
+            </div>
+
+            <div className="modal-body">
+              {!isEditingBank && (bankFormData.chave_pix || bankFormData.banco || bankFormData.conta) ? (
+                /* MODO VISUALIZAÇÃO / CONFERÊNCIA */
+                <div className="bank-view-container">
+                  {/* Bloco Chave PIX */}
+                  <div className="pix-highlight-card">
+                    <div className="pix-header">
+                      <div className="pix-type-label">Chave PIX ({bankFormData.tipo_chave_pix || 'Chave'}):</div>
+                      {bankFormData.chave_pix && (
+                        <button
+                          type="button"
+                          className="btn-copy-pix"
+                          onClick={() => handleCopyPix(bankFormData.chave_pix)}
+                          title="Copiar apenas a chave PIX"
+                        >
+                          <Copy size={14} /> Copiar PIX
+                        </button>
+                      )}
+                    </div>
+                    <div className="pix-key-val">
+                      {bankFormData.chave_pix || '(Nenhuma chave cadastrada)'}
+                    </div>
+                  </div>
+
+                  {/* Detalhes Bancários da Conta */}
+                  <div className="bank-details-grid">
+                    <div className="bank-detail-item">
+                      <span className="lbl">Banco:</span>
+                      <span className="val fw-bold">{bankFormData.banco || '(Não informado)'}</span>
+                    </div>
+                    <div className="bank-detail-item">
+                      <span className="lbl">Tipo de Conta:</span>
+                      <span className="val">{bankFormData.tipo_conta || 'Corrente'}</span>
+                    </div>
+                    <div className="bank-detail-item">
+                      <span className="lbl">Agência:</span>
+                      <span className="val fw-bold">{bankFormData.agencia || '-'}</span>
+                    </div>
+                    <div className="bank-detail-item">
+                      <span className="lbl">Conta com Dígito:</span>
+                      <span className="val fw-bold">{bankFormData.conta || '-'}</span>
+                    </div>
+                    <div className="bank-detail-item">
+                      <span className="lbl">Titular:</span>
+                      <span className="val">{bankFormData.titular || bankFormData.nome}</span>
+                    </div>
+                    <div className="bank-detail-item">
+                      <span className="lbl">CPF / CNPJ:</span>
+                      <span className="val">{bankFormData.cpf_cnpj || '(Não informado)'}</span>
+                    </div>
+                  </div>
+
+                  {bankFormData.observacoes && (
+                    <div className="bank-obs-box">
+                      <strong>Observações:</strong> {bankFormData.observacoes}
+                    </div>
+                  )}
+
+                  {/* Ações de Cópia e Edição */}
+                  <div className="bank-actions-footer">
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => handleCopyAllBankData(bankFormData)}
+                    >
+                      <Copy size={16} /> Copiar Todos os Dados
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => setIsEditingBank(true)}
+                    >
+                      <Edit3 size={16} /> Editar Dados Bancários
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* MODO CADASTRO / EDIÇÃO */
+                <form onSubmit={handleSaveBankData} className="bank-form">
+                  <div className="form-group mb-12">
+                    <label className="fw-medium">Nome do Responsável:</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      value={bankFormData.nome}
+                      onChange={(e) => setBankFormData({ ...bankFormData, nome: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                    <div className="form-group">
+                      <label className="fw-medium">CPF ou CNPJ:</label>
+                      <input 
+                        type="text" 
+                        className="form-control"
+                        placeholder="000.000.000-00"
+                        value={bankFormData.cpf_cnpj}
+                        onChange={(e) => setBankFormData({ ...bankFormData, cpf_cnpj: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="fw-medium">Telefone / WhatsApp:</label>
+                      <input 
+                        type="text" 
+                        className="form-control"
+                        placeholder="(00) 00000-0000"
+                        value={bankFormData.telefone}
+                        onChange={(e) => setBankFormData({ ...bankFormData, telefone: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12, marginBottom: 12 }}>
+                    <div className="form-group">
+                      <label className="fw-medium">Banco:</label>
+                      <input 
+                        type="text" 
+                        className="form-control"
+                        list="bancos-sugestoes"
+                        placeholder="Ex: Nubank, Banco do Brasil..."
+                        value={bankFormData.banco}
+                        onChange={(e) => setBankFormData({ ...bankFormData, banco: e.target.value })}
+                      />
+                      <datalist id="bancos-sugestoes">
+                        {BANCOS_COMUNS.map(b => (
+                          <option key={b} value={b} />
+                        ))}
+                      </datalist>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="fw-medium">Tipo de Conta:</label>
+                      <select 
+                        className="form-control"
+                        value={bankFormData.tipo_conta}
+                        onChange={(e) => setBankFormData({ ...bankFormData, tipo_conta: e.target.value })}
+                      >
+                        <option value="Corrente">Corrente</option>
+                        <option value="Poupança">Poupança</option>
+                        <option value="Pagamento">Pagamento</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginBottom: 12 }}>
+                    <div className="form-group">
+                      <label className="fw-medium">Agência (com dígito):</label>
+                      <input 
+                        type="text" 
+                        className="form-control"
+                        placeholder="0001"
+                        value={bankFormData.agencia}
+                        onChange={(e) => setBankFormData({ ...bankFormData, agencia: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="fw-medium">Conta com Dígito:</label>
+                      <input 
+                        type="text" 
+                        className="form-control"
+                        placeholder="1234567-8"
+                        value={bankFormData.conta}
+                        onChange={(e) => setBankFormData({ ...bankFormData, conta: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Bloco Chave PIX */}
+                  <div className="pix-edit-fieldset">
+                    <span className="fieldset-title">Configuração da Chave PIX</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr', gap: 12, marginTop: 8 }}>
+                      <div className="form-group">
+                        <label className="fw-medium">Tipo da Chave:</label>
+                        <select 
+                          className="form-control"
+                          value={bankFormData.tipo_chave_pix}
+                          onChange={(e) => setBankFormData({ ...bankFormData, tipo_chave_pix: e.target.value })}
+                        >
+                          <option value="CPF/CNPJ">CPF / CNPJ</option>
+                          <option value="Celular">Celular / Telefone</option>
+                          <option value="E-mail">E-mail</option>
+                          <option value="Chave Aleatória">Chave Aleatória</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="fw-medium">Chave PIX:</label>
+                        <input 
+                          type="text" 
+                          className="form-control"
+                          placeholder="Informe a chave PIX exata..."
+                          value={bankFormData.chave_pix}
+                          onChange={(e) => setBankFormData({ ...bankFormData, chave_pix: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-group mb-12">
+                    <label className="fw-medium">Titular da Conta (se diferente do responsável):</label>
+                    <input 
+                      type="text" 
+                      className="form-control"
+                      placeholder="Nome completo do titular da conta"
+                      value={bankFormData.titular}
+                      onChange={(e) => setBankFormData({ ...bankFormData, titular: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group mb-15">
+                    <label className="fw-medium">Observações adicionais para pagamento:</label>
+                    <textarea 
+                      rows="2"
+                      className="form-control"
+                      placeholder="Ex: Preferência pagamento via PIX celular; banco digital."
+                      value={bankFormData.observacoes}
+                      onChange={(e) => setBankFormData({ ...bankFormData, observacoes: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="modal-footer-edit">
+                    {cadastrosMap[activeBankPerson.trim().toLowerCase()] && (
+                      <button 
+                        type="button" 
+                        className="btn btn-outline" 
+                        onClick={() => setIsEditingBank(false)}
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary"
+                      disabled={isSavingBank}
+                    >
+                      <Save size={16} />
+                      {isSavingBank ? 'Salvando...' : 'Salvar Dados Bancários'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
