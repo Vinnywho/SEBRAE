@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { 
   fetchCadastrosBancarios, 
+  saveCadastroBancario,
   deleteCadastroBancario 
 } from '../../services/bancarioService';
 import ModalDadosBancarios from '../../components/ModalDadosBancarios/ModalDadosBancarios';
@@ -51,6 +52,7 @@ const Configuracoes = () => {
   // Equipe & Dados Bancários State
   const [cadastrosEquipe, setCadastrosEquipe] = useState([]);
   const [loadingEquipe, setLoadingEquipe] = useState(false);
+  const [isSyncingEquipe, setIsSyncingEquipe] = useState(false);
   const [showRespModal, setShowRespModal] = useState(false);
   const [selectedRespItem, setSelectedRespItem] = useState(null);
   const [forceEditResp, setForceEditResp] = useState(false);
@@ -112,35 +114,58 @@ const Configuracoes = () => {
   };
 
   const detectarEquipeDasOS = async () => {
+    setIsSyncingEquipe(true);
     try {
-      const { data, error } = await supabase.from('os_responsaveis').select('nome');
-      if (error) throw error;
-      const existingNames = new Set(cadastrosEquipe.map(c => (c.nome || '').trim().toLowerCase()));
-      const novos = new Set();
-      (data || []).forEach(r => {
+      // Busca responsáveis tanto da tabela os_responsaveis quanto de os_detalhes para não deixar ninguém de fora
+      const [respRes, detRes] = await Promise.all([
+        supabase.from('os_responsaveis').select('nome'),
+        supabase.from('os_detalhes').select('responsavel_servico')
+      ]);
+
+      if (respRes.error) throw respRes.error;
+      if (detRes.error) throw detRes.error;
+
+      // Buscar os cadastros mais recentes para comparação precisa
+      const cadastrosAtuais = await fetchCadastrosBancarios();
+      const existingNames = new Set((cadastrosAtuais || []).map(c => (c.nome || '').trim().toLowerCase()));
+      const nomesParaInserir = new Map();
+
+      (respRes.data || []).forEach(r => {
         const n = (r.nome || '').trim();
-        if (n && !existingNames.has(n.toLowerCase())) {
-          novos.add(n);
+        const lower = n.toLowerCase();
+        if (n && !existingNames.has(lower) && !nomesParaInserir.has(lower)) {
+          nomesParaInserir.set(lower, n);
         }
       });
 
-      if (novos.size === 0) {
+      (detRes.data || []).forEach(d => {
+        const n = (d.responsavel_servico || '').trim();
+        const lower = n.toLowerCase();
+        if (n && !existingNames.has(lower) && !nomesParaInserir.has(lower)) {
+          nomesParaInserir.set(lower, n);
+        }
+      });
+
+      if (nomesParaInserir.size === 0) {
         toast.info('Todos os responsáveis encontrados nas OSs já estão cadastrados!');
         return;
       }
 
-      for (const nome of novos) {
+      for (const nome of nomesParaInserir.values()) {
         await saveCadastroBancario({
           nome,
+          titular: nome,
           tipo_conta: 'Corrente',
           tipo_chave_pix: 'Chave Aleatória'
         });
       }
 
-      toast.success(`${novos.size} novo(s) responsável(is) detectado(s) e inserido(s) com sucesso!`);
+      toast.success(`${nomesParaInserir.size} novo(s) responsável(is) detectado(s) e inserido(s) com sucesso!`);
       await loadEquipeCadastros();
     } catch (err) {
       toast.error('Erro ao sincronizar responsáveis: ' + err.message);
+    } finally {
+      setIsSyncingEquipe(false);
     }
   };
 
@@ -669,8 +694,15 @@ const Configuracoes = () => {
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <button type="button" className="btn-outline" onClick={detectarEquipeDasOS}>
-                  <RefreshCw size={14} /> Sincronizar das OSs
+                <button 
+                  type="button" 
+                  className="btn-outline" 
+                  onClick={detectarEquipeDasOS}
+                  disabled={isSyncingEquipe || loadingEquipe}
+                  title="Detecta e cadastra automaticamente novos responsáveis atribuídos às Ordens de Serviço"
+                >
+                  <RefreshCw size={14} className={isSyncingEquipe ? 'spin-icon' : ''} />
+                  {isSyncingEquipe ? " Sincronizando..." : " Sincronizar das OS's"}
                 </button>
                 <button type="button" className="btn-primary" onClick={openNewRespModal}>
                   <Plus size={16} /> Cadastrar Responsável
@@ -765,8 +797,14 @@ const Configuracoes = () => {
                   Clique em "Sincronizar das OSs" para importar os nomes já utilizados nas Ordens de Serviço ou cadastre manualmente.
                 </p>
                 <div style={{ marginTop: 15, display: 'flex', gap: 10, justifyContent: 'center' }}>
-                  <button type="button" className="btn-outline" onClick={detectarEquipeDasOS}>
-                    Sincronizar das OSs
+                  <button 
+                    type="button" 
+                    className="btn-outline" 
+                    onClick={detectarEquipeDasOS}
+                    disabled={isSyncingEquipe || loadingEquipe}
+                  >
+                    <RefreshCw size={14} className={isSyncingEquipe ? 'spin-icon' : ''} />
+                    {isSyncingEquipe ? " Sincronizando..." : " Sincronizar das OS's"}
                   </button>
                   <button type="button" className="btn-primary" onClick={openNewRespModal}>
                     <Plus size={16} /> Cadastrar Agora

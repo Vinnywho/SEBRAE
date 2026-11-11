@@ -98,7 +98,7 @@ export const saveCadastroBancario = async (cadastro) => {
     tipo_conta: cadastro.tipo_conta || 'Corrente',
     tipo_chave_pix: cadastro.tipo_chave_pix || 'Chave Aleatória',
     chave_pix: (cadastro.chave_pix || '').trim(),
-    titular: (cadastro.titular || '').trim(),
+    titular: (cadastro.titular || cadastro.nome || '').trim(),
     telefone: (cadastro.telefone || '').trim(),
     email: (cadastro.email || '').trim(),
     observacoes: (cadastro.observacoes || '').trim(),
