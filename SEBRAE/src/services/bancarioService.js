@@ -92,6 +92,7 @@ export const saveCadastroBancario = async (cadastro) => {
   const payload = {
     nome: cadastro.nome.trim(),
     cpf_cnpj: (cadastro.cpf_cnpj || '').trim(),
+    rg: (cadastro.rg || '').trim(),
     banco: (cadastro.banco || '').trim(),
     agencia: (cadastro.agencia || '').trim(),
     conta: (cadastro.conta || '').trim(),
@@ -107,9 +108,17 @@ export const saveCadastroBancario = async (cadastro) => {
 
   // 1. Tentar salvar na tabela dedicada
   try {
-    await supabase
+    const { error: upsertErr } = await supabase
       .from('responsaveis_cadastros')
       .upsert(payload, { onConflict: 'nome' });
+
+    // Se o banco ainda não rodou a migration 008 (falta coluna rg), salva sem rg no banco
+    if (upsertErr && upsertErr.message && upsertErr.message.toLowerCase().includes('rg')) {
+      const { rg: _rg, ...payloadWithoutRg } = payload;
+      await supabase
+        .from('responsaveis_cadastros')
+        .upsert(payloadWithoutRg, { onConflict: 'nome' });
+    }
   } catch (_err) {
     // Tabela pode não existir
   }
@@ -237,6 +246,9 @@ export const formatDadosParaCopia = (c) => {
   lines.push(`DADOS BANCÁRIOS - ${c.nome}`);
   if (c.titular && c.titular !== c.nome) lines.push(`Titular: ${c.titular}`);
   if (c.cpf_cnpj) lines.push(`CPF/CNPJ: ${c.cpf_cnpj}`);
+  if (c.rg) lines.push(`RG: ${c.rg}`);
+  if (c.email) lines.push(`E-mail: ${c.email}`);
+  if (c.telefone) lines.push(`Telefone: ${c.telefone}`);
   if (c.banco) lines.push(`Banco: ${c.banco}`);
   if (c.agencia) lines.push(`Agência: ${c.agencia}`);
   if (c.conta) lines.push(`Conta: ${c.conta} (${c.tipo_conta || 'Corrente'})`);

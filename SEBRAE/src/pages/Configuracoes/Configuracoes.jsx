@@ -6,7 +6,7 @@ import { formatDateTime, formatBRL } from '../../utils/format';
 import { 
   Settings, RefreshCw, Archive, User, FileText, Edit2, Plus, X, 
   Save, Trash2, Camera, Lock, Eye, KeyRound, CheckCircle2,
-  Landmark, CreditCard
+  Landmark, CreditCard, Mail, Phone
 } from 'lucide-react';
 import { 
   fetchCadastrosBancarios, 
@@ -718,12 +718,12 @@ const Configuracoes = () => {
                   <thead>
                     <tr>
                       <th>Responsável</th>
-                      <th>CPF / CNPJ</th>
+                      <th>Documentos (CPF / RG)</th>
                       <th>Banco</th>
                       <th>Agência / Conta</th>
                       <th>Chave PIX</th>
                       <th>Titular</th>
-                      <th>Contato</th>
+                      <th>Contato (E-mail / Tel)</th>
                       <th style={{ textAlign: 'right' }}>Ações</th>
                     </tr>
                   </thead>
@@ -733,10 +733,24 @@ const Configuracoes = () => {
                         <td className="fw-bold">
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <User size={16} className="text-muted" />
-                            {resp.nome}
+                            <div>
+                              <div>{resp.nome}</div>
+                              {resp.email && (
+                                <div style={{ fontSize: 11, fontWeight: 'normal', color: '#64748b' }}>
+                                  {resp.email}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td>{resp.cpf_cnpj || '-'}</td>
+                        <td>
+                          {resp.cpf_cnpj || resp.rg ? (
+                            <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              {resp.cpf_cnpj && <div><span className="text-muted">CPF:</span> {resp.cpf_cnpj}</div>}
+                              {resp.rg && <div><span className="text-muted">RG:</span> {resp.rg}</div>}
+                            </div>
+                          ) : '-'}
+                        </td>
                         <td>
                           {resp.banco ? (
                             <span style={{ fontWeight: 500, color: '#0369a1' }}>{resp.banco}</span>
@@ -755,7 +769,24 @@ const Configuracoes = () => {
                           ) : '-'}
                         </td>
                         <td>{resp.titular || resp.nome || '-'}</td>
-                        <td>{resp.telefone || resp.email || '-'}</td>
+                        <td>
+                          {resp.email || resp.telefone ? (
+                            <div style={{ fontSize: 12, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              {resp.email && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Mail size={12} className="text-muted" />
+                                  <span>{resp.email}</span>
+                                </div>
+                              )}
+                              {resp.telefone && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Phone size={12} className="text-muted" />
+                                  <span>{resp.telefone}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : '-'}
+                        </td>
                         <td style={{ textAlign: 'right' }}>
                           <button 
                             type="button" 

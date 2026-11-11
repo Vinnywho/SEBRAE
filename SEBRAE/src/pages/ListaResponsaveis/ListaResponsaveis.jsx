@@ -497,7 +497,14 @@ const ListaResponsaveis = () => {
                         <td className="fw-bold">
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <User size={16} className="text-muted" />
-                            {p.nome}
+                            <div>
+                              <div>{p.nome}</div>
+                              {bankData?.email && (
+                                <div style={{ fontSize: 11, fontWeight: 'normal', color: '#64748b' }}>
+                                  {bankData.email}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </td>
 
@@ -715,7 +722,15 @@ const ListaResponsaveis = () => {
                       </td>
                       <td className="fw-bold">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <User size={16} className="text-muted" /> {r.nome}
+                          <User size={16} className="text-muted" />
+                          <div>
+                            <div>{r.nome}</div>
+                            {bankData?.email && (
+                              <div style={{ fontSize: 11, fontWeight: 'normal', color: '#64748b' }}>
+                                {bankData.email}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </td>
 

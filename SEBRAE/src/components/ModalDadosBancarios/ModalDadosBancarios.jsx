@@ -11,7 +11,8 @@ import {
   Phone, 
   FileText,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Mail
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { 
@@ -24,6 +25,7 @@ import './ModalDadosBancarios.css';
 const DEFAULT_FORM_DATA = {
   nome: '',
   cpf_cnpj: '',
+  rg: '',
   banco: '',
   agencia: '',
   conta: '',
@@ -59,6 +61,7 @@ const ModalDadosBancarios = ({
       setFormData({
         nome: initialData.nome || responsavel || '',
         cpf_cnpj: initialData.cpf_cnpj || '',
+        rg: initialData.rg || '',
         banco: initialData.banco || '',
         agencia: initialData.agencia || '',
         conta: initialData.conta || '',
@@ -95,7 +98,15 @@ const ModalDadosBancarios = ({
   if (!isOpen) return null;
 
   const hasAnyData = Boolean(
-    initialData && (initialData.banco || initialData.chave_pix || initialData.conta || initialData.cpf_cnpj)
+    initialData && (
+      initialData.banco || 
+      initialData.chave_pix || 
+      initialData.conta || 
+      initialData.cpf_cnpj || 
+      initialData.rg || 
+      initialData.email || 
+      initialData.telefone
+    )
   );
 
   const handleCopyPix = (chave) => {
@@ -247,17 +258,29 @@ const ModalDadosBancarios = ({
                     <span className="cell-value">{formData.titular || formData.nome || '-'}</span>
                   </div>
                   {formData.cpf_cnpj && (
-                    <div className="banco-detail-cell cell-full">
-                      <span className="cell-label">CPF / CNPJ do Titular</span>
+                    <div className="banco-detail-cell">
+                      <span className="cell-label">CPF / CNPJ</span>
                       <span className="cell-value">{formData.cpf_cnpj}</span>
+                    </div>
+                  )}
+                  {formData.rg && (
+                    <div className="banco-detail-cell">
+                      <span className="cell-label">RG</span>
+                      <span className="cell-value">{formData.rg}</span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* OBSERVAÇÕES E CONTATO (SE HOUVER) */}
-              {(formData.telefone || formData.observacoes) && (
+              {(formData.email || formData.telefone || formData.observacoes) && (
                 <div className="banco-extra-info-card">
+                  {formData.email && (
+                    <div className="banco-extra-row">
+                      <Mail size={15} className="extra-icon" />
+                      <span><strong>E-mail:</strong> {formData.email}</span>
+                    </div>
+                  )}
                   {formData.telefone && (
                     <div className="banco-extra-row">
                       <Phone size={15} className="extra-icon" />
@@ -303,6 +326,29 @@ const ModalDadosBancarios = ({
                       placeholder="000.000.000-00"
                       value={formData.cpf_cnpj}
                       onChange={(e) => setFormData({ ...formData, cpf_cnpj: e.target.value })}
+                    />
+                  </div>
+                  <div className="banco-form-group">
+                    <label className="banco-field-label">RG</label>
+                    <input 
+                      type="text" 
+                      className="banco-field-input"
+                      placeholder="Ex: 12.345.678-9"
+                      value={formData.rg}
+                      onChange={(e) => setFormData({ ...formData, rg: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="banco-form-row-2">
+                  <div className="banco-form-group">
+                    <label className="banco-field-label">E-mail</label>
+                    <input 
+                      type="email" 
+                      className="banco-field-input"
+                      placeholder="exemplo@email.com"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     />
                   </div>
                   <div className="banco-form-group">

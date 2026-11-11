@@ -4,7 +4,9 @@ import { supabase } from '../../supabase';
 import { useConfig } from '../../context/ConfigContext';
 import { useToast } from '../../context/ToastContext';
 import { getDayOfWeek, formatBRL } from '../../utils/format';
-import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit, Printer } from 'lucide-react';
+import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit, Printer, Landmark } from 'lucide-react';
+import { fetchCadastrosBancarios } from '../../services/bancarioService';
+import ModalDadosBancarios from '../../components/ModalDadosBancarios/ModalDadosBancarios';
 import sebraeLogo from '../../assets/img/sebrae.svg';
 import './OSForm.css';
 
@@ -60,6 +62,34 @@ const OSForm = () => {
 
   const [despesasResponsaveis, setDespesasResponsaveis] = useState({});
   const [activeRespTab, setActiveRespTab] = useState('');
+
+  // Equipe & Dados Bancários
+  const [cadastrosEquipe, setCadastrosEquipe] = useState([]);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [activeBankPerson, setActiveBankPerson] = useState('');
+
+  const loadCadastros = async () => {
+    try {
+      const data = await fetchCadastrosBancarios();
+      setCadastrosEquipe(data || []);
+    } catch (_e) {
+      // ignora
+    }
+  };
+
+  useEffect(() => {
+    loadCadastros();
+  }, []);
+
+  const cadastrosMap = useMemo(() => {
+    const map = {};
+    (cadastrosEquipe || []).forEach(c => {
+      if (c && c.nome) {
+        map[c.nome.trim().toLowerCase()] = c;
+      }
+    });
+    return map;
+  }, [cadastrosEquipe]);
 
   // Fetch initial data
   useEffect(() => {
@@ -461,7 +491,22 @@ const OSForm = () => {
                 
                 <div className="grid-3 mb-15">
                   <div className="input-group">
-                    <label>Nome do Responsável *</label><input type="text" name="responsavel" value={detalheInput.responsavel} onChange={handleDetInput} placeholder="Ex: João Silva"/>
+                    <label>Nome do Responsável *</label>
+                    <input 
+                      type="text" 
+                      name="responsavel" 
+                      value={detalheInput.responsavel} 
+                      onChange={handleDetInput} 
+                      placeholder="Ex: João Silva"
+                      list="osform-responsaveis-list"
+                    />
+                    <datalist id="osform-responsaveis-list">
+                      {cadastrosEquipe.map((c, i) => (
+                        <option key={c.id || i} value={c.nome}>
+                          {c.nome} {c.email ? `(${c.email})` : ''}
+                        </option>
+                      ))}
+                    </datalist>
                   </div>
                   
                   <div className="input-group span-2-responsive" style={{gridColumn: 'span 2'}}>
@@ -529,6 +574,32 @@ const OSForm = () => {
                 
                 {activeRespTab && (
                   <div className="resp-content">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                      <div>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                          Lançamento de despesas: <strong>{activeRespTab}</strong>
+                        </span>
+                        {cadastrosMap[activeRespTab.trim().toLowerCase()]?.email && (
+                          <span style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>
+                            ({cadastrosMap[activeRespTab.trim().toLowerCase()].email})
+                          </span>
+                        )}
+                      </div>
+                      <button 
+                        type="button" 
+                        className="btn-outline"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '5px 12px', background: '#f8fafc' }}
+                        onClick={() => {
+                          setActiveBankPerson(activeRespTab);
+                          setShowBankModal(true);
+                        }}
+                        title="Conferir dados bancários, RG e e-mail deste responsável"
+                      >
+                        <Landmark size={14} color="#0084ff" />
+                        <span>Dados Bancários / RG / E-mail</span>
+                      </button>
+                    </div>
+
                     <div className="resp-despesas-grid mb-15">
                       <div className="input-group"><label>Freelance (R$)</label><input type="number" step="any" name="valorFreelance" value={respData.valorFreelance} onChange={handleRespInput} disabled={isViewMode}/></div>
                       <div className="input-group"><label>Condução (R$)</label><input type="number" step="any" name="reembolsoConducao" value={respData.reembolsoConducao} onChange={handleRespInput} disabled={isViewMode}/></div>
@@ -776,6 +847,18 @@ const OSForm = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de Dados Bancários, RG e E-mail */}
+      <ModalDadosBancarios 
+        isOpen={showBankModal}
+        onClose={() => setShowBankModal(false)}
+        responsavel={activeBankPerson}
+        initialData={cadastrosMap[activeBankPerson.trim().toLowerCase()] || null}
+        forceEdit={false}
+        onSaveSuccess={async () => {
+          await loadCadastros();
+        }}
+      />
     </>
   );
 };
