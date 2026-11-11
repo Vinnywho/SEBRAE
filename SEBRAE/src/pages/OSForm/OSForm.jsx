@@ -4,8 +4,8 @@ import { supabase } from '../../supabase';
 import { useConfig } from '../../context/ConfigContext';
 import { useToast } from '../../context/ToastContext';
 import { getDayOfWeek, formatBRL } from '../../utils/format';
-import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit, Printer, Landmark } from 'lucide-react';
-import { fetchCadastrosBancarios } from '../../services/bancarioService';
+import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit, Printer, Landmark, UserPlus } from 'lucide-react';
+import { fetchCadastrosBancarios, saveCadastroBancario } from '../../services/bancarioService';
 import ModalDadosBancarios from '../../components/ModalDadosBancarios/ModalDadosBancarios';
 import sebraeLogo from '../../assets/img/sebrae.svg';
 import './OSForm.css';
@@ -67,6 +67,21 @@ const OSForm = () => {
   const [cadastrosEquipe, setCadastrosEquipe] = useState([]);
   const [showBankModal, setShowBankModal] = useState(false);
   const [activeBankPerson, setActiveBankPerson] = useState('');
+  const [isNovoResp, setIsNovoResp] = useState(false);
+  const [novoRespNome, setNovoRespNome] = useState('');
+
+  const handleResponsavelSelect = (e) => {
+    const val = e.target.value;
+    if (val === '__NOVO__') {
+      setIsNovoResp(true);
+      setNovoRespNome('');
+      setDetalheInput(prev => ({ ...prev, responsavel: '' }));
+    } else {
+      setIsNovoResp(false);
+      setNovoRespNome('');
+      setDetalheInput(prev => ({ ...prev, responsavel: val }));
+    }
+  };
 
   const loadCadastros = async () => {
     try {
@@ -222,9 +237,31 @@ const OSForm = () => {
     }));
   };
 
-  const addOrUpdateDetalhe = () => {
-    if (!formData.lote || !detalheInput.responsavel || !detalheInput.produtoId) {
-      return toast.warning("Preencha o Lote no Passo 1, o Responsável e selecione o Produto.");
+  const addOrUpdateDetalhe = async () => {
+    const nomeFinal = (isNovoResp ? novoRespNome : (detalheInput.responsavel || '')).trim();
+
+    if (!formData.lote || !nomeFinal || !detalheInput.produtoId) {
+      return toast.warning("Preencha o Lote no Passo 1, selecione ou digite o Responsável e selecione o Produto.");
+    }
+
+    // Se for um responsável que ainda não existe no cadastro da equipe, vira um novo cadastro automaticamente!
+    const jaCadastrado = cadastrosEquipe.some(
+      c => c.nome?.trim().toLowerCase() === nomeFinal.toLowerCase()
+    );
+
+    if (!jaCadastrado) {
+      try {
+        await saveCadastroBancario({
+          nome: nomeFinal,
+          titular: nomeFinal,
+          tipo_conta: 'Corrente',
+          tipo_chave_pix: 'Chave Aleatória'
+        });
+        toast.success(`"${nomeFinal}" cadastrado na equipe com sucesso!`);
+        await loadCadastros();
+      } catch (err) {
+        console.error("Erro ao cadastrar novo responsável:", err);
+      }
     }
     
     let baseValue = 0;
@@ -250,6 +287,7 @@ const OSForm = () => {
 
     const novoDetalhe = { 
       ...detalheInput, 
+      responsavel: nomeFinal,
       baseServico: baseNome,
       notasServico: notasLimpa,
       servico: nomeServicoFinal,
@@ -269,6 +307,8 @@ const OSForm = () => {
       toast.success("Detalhe adicionado à OS.");
     }
     setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', baseServico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
+    setIsNovoResp(false);
+    setNovoRespNome('');
   };
 
   const editDetalhe = (idx) => {
@@ -287,6 +327,19 @@ const OSForm = () => {
       }
     }
 
+    const respNome = (item.responsavel || '').trim();
+    const jaExiste = cadastrosEquipe.some(
+      c => c.nome?.trim().toLowerCase() === respNome.toLowerCase()
+    );
+
+    if (jaExiste || !respNome) {
+      setIsNovoResp(false);
+      setNovoRespNome('');
+    } else {
+      setIsNovoResp(true);
+      setNovoRespNome(respNome);
+    }
+
     setDetalheInput({
       ...item,
       baseServico: item.baseServico || baseServico,
@@ -302,6 +355,8 @@ const OSForm = () => {
     if (editDetalheIndex === idx) {
       setEditDetalheIndex(null);
       setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', baseServico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
+      setIsNovoResp(false);
+      setNovoRespNome('');
     }
     toast.info("Detalhe removido.");
   };
@@ -323,6 +378,28 @@ const OSForm = () => {
     if (!formData.numeroOS) return toast.warning("Número da OS é obrigatório.");
     setIsSaving(true);
     try {
+      // Garante que todo responsável da OS esteja cadastrado na equipe
+      const todosNomes = Array.from(new Set([
+        ...detalhes.map(d => (d.responsavel || '').trim()).filter(Boolean),
+        ...Object.keys(despesasResponsaveis).map(n => n.trim()).filter(Boolean)
+      ]));
+
+      for (const n of todosNomes) {
+        const jaCad = cadastrosEquipe.some(c => c.nome?.trim().toLowerCase() === n.toLowerCase());
+        if (!jaCad) {
+          try {
+            await saveCadastroBancario({
+              nome: n,
+              titular: n,
+              tipo_conta: 'Corrente',
+              tipo_chave_pix: 'Chave Aleatória'
+            });
+          } catch (_e) {
+            // ignora
+          }
+        }
+      }
+
       const payloadOs = {
         numero_os: formData.numeroOS, 
         lote: formData.lote, 
@@ -491,22 +568,96 @@ const OSForm = () => {
                 
                 <div className="grid-3 mb-15">
                   <div className="input-group">
-                    <label>Nome do Responsável *</label>
-                    <input 
-                      type="text" 
-                      name="responsavel" 
-                      value={detalheInput.responsavel} 
-                      onChange={handleDetInput} 
-                      placeholder="Ex: João Silva"
-                      list="osform-responsaveis-list"
-                    />
-                    <datalist id="osform-responsaveis-list">
-                      {cadastrosEquipe.map((c, i) => (
-                        <option key={c.id || i} value={c.nome}>
-                          {c.nome} {c.email ? `(${c.email})` : ''}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label style={{ margin: 0 }}>Nome do Responsável *</label>
+                      {!isNovoResp ? (
+                        <button
+                          type="button"
+                          onClick={() => { setIsNovoResp(true); setNovoRespNome(''); }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#0084ff',
+                            fontSize: 12,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            padding: 0
+                          }}
+                          title="Inserir um novo responsável que não está na lista suspensa"
+                        >
+                          <UserPlus size={13} /> + Novo Responsável
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setIsNovoResp(false); setNovoRespNome(''); }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#64748b',
+                            fontSize: 12,
+                            cursor: 'pointer',
+                            padding: 0
+                          }}
+                        >
+                          ↩ Escolher da lista suspensa
+                        </button>
+                      )}
+                    </div>
+
+                    {!isNovoResp ? (
+                      <select 
+                        name="responsavel" 
+                        value={detalheInput.responsavel || ''} 
+                        onChange={handleResponsavelSelect}
+                        style={{ width: '100%' }}
+                      >
+                        <option value="">Selecione um responsável cadastrado...</option>
+                        {cadastrosEquipe.map((c, i) => (
+                          <option key={c.id || i} value={c.nome}>
+                            {c.nome} {c.email ? `(${c.email})` : ''}
+                          </option>
+                        ))}
+                        {detalheInput.responsavel && !cadastrosEquipe.some(c => c.nome?.trim().toLowerCase() === detalheInput.responsavel.trim().toLowerCase()) && (
+                          <option value={detalheInput.responsavel}>
+                            {detalheInput.responsavel} (Atual)
+                          </option>
+                        )}
+                        <option value="__NOVO__" style={{ fontWeight: 'bold', color: '#0084ff' }}>
+                          ➕ Outro / Novo Responsável (digitar novo nome)...
                         </option>
-                      ))}
-                    </datalist>
+                      </select>
+                    ) : (
+                      <div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input 
+                            type="text" 
+                            name="novoResponsavel" 
+                            value={novoRespNome} 
+                            onChange={(e) => setNovoRespNome(e.target.value)} 
+                            placeholder="Digite o nome completo do novo responsável..."
+                            autoFocus
+                            style={{ flex: 1 }}
+                          />
+                          <button
+                            type="button"
+                            className="btn-outline"
+                            onClick={() => { setIsNovoResp(false); setNovoRespNome(''); }}
+                            style={{ fontSize: 12, padding: '6px 10px', whiteSpace: 'nowrap' }}
+                            title="Voltar para a seleção da lista suspensa"
+                          >
+                            Voltar à lista
+                          </button>
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 11, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <UserPlus size={12} />
+                          <span>Não cadastrado: será adicionado automaticamente ao banco da equipe.</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="input-group span-2-responsive" style={{gridColumn: 'span 2'}}>
@@ -542,7 +693,18 @@ const OSForm = () => {
                 
                 <div style={{display:'flex', justifyContent:'flex-end', gap: '10px', flexWrap: 'wrap'}}>
                   {editDetalheIndex !== null && (
-                    <button type="button" className="btn-outline" onClick={() => {setEditDetalheIndex(null); setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', baseServico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 })}}>Cancelar edição</button>
+                    <button 
+                      type="button" 
+                      className="btn-outline" 
+                      onClick={() => {
+                        setEditDetalheIndex(null); 
+                        setDetalheInput({ data: '', responsavel: '', horarioGravacao: '', horarioSaida: '', servico: '', baseServico: '', notasServico: '', quantidadeDiarias: 1, produtoId: '', valorUnitarioBaseLegado: 0 });
+                        setIsNovoResp(false);
+                        setNovoRespNome('');
+                      }}
+                    >
+                      Cancelar edição
+                    </button>
                   )}
                   <button type="button" className="btn-primary" onClick={addOrUpdateDetalhe}>
                     <Plus size={16}/> {editDetalheIndex !== null ? 'Atualizar Detalhe' : 'Adicionar Detalhe'}
