@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useConfig } from '../../context/ConfigContext';
 import { useToast } from '../../context/ToastContext';
 import { isRecentlyEdited, formatBRL } from '../../utils/format';
+import { undoAuditLog } from '../../services/auditService';
 import { Edit2, Trash2, Search, Plus, Clock, FileText, Download, CheckSquare, Filter, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import './ListaOS.css';
 
@@ -40,6 +41,32 @@ const ListaOS = () => {
     setIsLoading(false);
   };
 
+  const handleUndoLog = async (logId) => {
+    try {
+      await undoAuditLog(logId);
+      toast.success('Ação desfeita com sucesso!');
+      await fetchOS();
+    } catch (err) {
+      toast.error('Erro ao desfazer ação: ' + err.message);
+    }
+  };
+
+  const handleUndoLocalNfs = async (snapshot) => {
+    try {
+      for (const item of snapshot) {
+        const { error } = await supabase
+          .from('ordens_servico')
+          .update({ nfs_e: item.nfs_e })
+          .eq('numero_os', item.numero_os);
+        if (error) throw error;
+      }
+      toast.success('NFS-e restaurada para o valor anterior!');
+      await fetchOS();
+    } catch (err) {
+      toast.error('Erro ao desfazer NFS-e: ' + err.message);
+    }
+  };
+
   const deletarOS = async (numero_os) => {
     const confirmed = await confirmDialog({
       title: 'Excluir Ordem de Serviço',
@@ -52,7 +79,7 @@ const ListaOS = () => {
     if (!confirmed) return;
 
     try {
-      const { error: rpcError } = await supabase.rpc('excluir_os', { p_numero_os: numero_os });
+      const { data: rpcData, error: rpcError } = await supabase.rpc('excluir_os', { p_numero_os: numero_os });
       if (rpcError) {
         const { error } = await supabase
           .from('ordens_servico')
@@ -60,9 +87,20 @@ const ListaOS = () => {
           .eq('numero_os', numero_os);
         if (error) throw error;
       }
-      setListaOS(listaOS.filter(os => os.numero_os !== numero_os));
+      setListaOS(prev => prev.filter(os => os.numero_os !== numero_os));
       setSelectedOSs(prev => prev.filter(id => id !== numero_os));
-      toast.success(`OS ${numero_os} excluída com sucesso!`);
+
+      const logId = !rpcError && rpcData?.log_id ? rpcData.log_id : null;
+      toast.success(
+        `OS ${numero_os} excluída com sucesso!`,
+        'Sucesso',
+        logId
+          ? {
+              duration: 10000,
+              action: { label: 'Desfazer', onClick: () => handleUndoLog(logId) }
+            }
+          : {}
+      );
     } catch (err) {
       toast.error("Erro ao deletar OS: " + err.message);
     }
@@ -127,8 +165,12 @@ const ListaOS = () => {
     const nfsTrimmed = bulkNfsE.trim();
     if (!nfsTrimmed) return toast.warning('Digite o número da NFS-e que deseja aplicar.');
     try {
+      const selectedSnapshot = listaOS
+        .filter(o => selectedOSs.includes(o.numero_os))
+        .map(o => ({ numero_os: o.numero_os, nfs_e: o.nfs_e ?? null }));
+
       // 1. Tentar executar via RPC para gravar logs de auditoria completos
-      const { error: rpcError } = await supabase.rpc('atualizar_nfs_e_em_massa', {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('atualizar_nfs_e_em_massa', {
         p_numeros_os: selectedOSs,
         p_nfs_e: nfsTrimmed
       });
@@ -143,11 +185,25 @@ const ListaOS = () => {
           
         if (fallbackError) throw fallbackError;
       }
-      
-      toast.success('NFS-e atribuída com sucesso para as OSs selecionadas!');
+
+      const logId = !rpcError && rpcData?.log_id ? rpcData.log_id : null;
+      const count = selectedOSs.length;
+
       setBulkNfsE('');
       setSelectedOSs([]);
-      fetchOS(); // Recarrega para ver as mudanças
+      await fetchOS(); // Recarrega para ver as mudanças
+
+      toast.success(
+        `NFS-e atribuída com sucesso para ${count} ${count === 1 ? 'OS' : 'OSs'}!`,
+        'Sucesso',
+        {
+          duration: 10000,
+          action: {
+            label: 'Desfazer',
+            onClick: () => (logId ? handleUndoLog(logId) : handleUndoLocalNfs(selectedSnapshot))
+          }
+        }
+      );
     } catch (err) {
       toast.error('Erro ao atribuir NFS-e: ' + err.message);
     }

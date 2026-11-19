@@ -6,16 +6,22 @@ import {
   Search, User, FileText, CheckCircle, Clock, MinusCircle, 
   Users, ChevronDown, ChevronRight, Calendar, ArrowRight,
   CheckSquare, ArrowUpDown, ArrowUp, ArrowDown, Landmark,
-  DollarSign, CreditCard
+  DollarSign, CreditCard, RotateCcw, History, X
 } from 'lucide-react';
-import { formatBRL, parseMonetary } from '../../utils/format';
+import { formatBRL, parseMonetary, formatDateTime, todayLocalISO } from '../../utils/format';
 import { fetchCadastrosBancarios } from '../../services/bancarioService';
+import {
+  undoAuditLog,
+  fetchRecentUndoablePaymentLogs,
+  getAcaoResumo,
+  getUndoConfirmMessage
+} from '../../services/auditService';
 import ModalDadosBancarios from '../../components/ModalDadosBancarios/ModalDadosBancarios';
 import './ListaResponsaveis.css';
 
 const ListaResponsaveis = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast, confirmDialog } = useToast();
   const [responsaveis, setResponsaveis] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
@@ -31,11 +37,15 @@ const ListaResponsaveis = () => {
   const [activeBankPerson, setActiveBankPerson] = useState('');
   const [isEditingBank, setIsEditingBank] = useState(false);
 
-  // Bulk Actions
+  // Bulk Actions & Undo
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState('Pago');
-  const [bulkDataPagamento, setBulkDataPagamento] = useState(new Date().toISOString().split('T')[0]);
+  const [bulkDataPagamento, setBulkDataPagamento] = useState(todayLocalISO());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const [recentPaymentLogs, setRecentPaymentLogs] = useState([]);
+  const [lastUndoBanner, setLastUndoBanner] = useState(null);
+  const [showUndoModal, setShowUndoModal] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
 
   // Ordenação por Nº de OS
   const [sortOrderOS, setSortOrderOS] = useState('none'); // 'none' | 'asc' | 'desc'
@@ -65,11 +75,17 @@ const ListaResponsaveis = () => {
     }
   }, []);
 
+  const loadRecentPaymentLogs = useCallback(async () => {
+    const data = await fetchRecentUndoablePaymentLogs(10);
+    setRecentPaymentLogs(data);
+  }, []);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchResponsaveis();
     loadCadastrosBancarios();
-  }, [fetchResponsaveis, loadCadastrosBancarios]);
+    loadRecentPaymentLogs();
+  }, [fetchResponsaveis, loadCadastrosBancarios, loadRecentPaymentLogs]);
 
   // Mapa de cadastros bancários por nome normalizado (lowercase)
   const cadastrosMap = useMemo(() => {
@@ -230,6 +246,57 @@ const ListaResponsaveis = () => {
     }
   };
 
+  const executeUndoPayload = useCallback(async (undoPayload, { askConfirm = false } = {}) => {
+    if (!undoPayload) return;
+
+    if (askConfirm) {
+      const msg = undoPayload.log
+        ? getUndoConfirmMessage(undoPayload.log)
+        : `Deseja desfazer a atribuição de "${undoPayload.status}" para ${undoPayload.itens?.length || 0} pagamento(s) e restaurar o status anterior?`;
+      const confirmed = await confirmDialog({
+        title: 'Desfazer Alteração de Pagamentos',
+        message: msg,
+        confirmText: 'Sim, desfazer',
+        cancelText: 'Cancelar',
+        isDanger: true
+      });
+      if (!confirmed) return;
+    }
+
+    setIsUndoing(true);
+    try {
+      if (undoPayload.logId) {
+        await undoAuditLog(undoPayload.logId);
+      } else if (undoPayload.itens && undoPayload.itens.length > 0) {
+        // Fallback local em sessão caso a RPC 009 ainda não esteja no banco
+        for (const item of undoPayload.itens) {
+          const { error: restoreErr } = await supabase
+            .from('os_responsaveis')
+            .update({
+              status_pagamento: item.status_pagamento || 'Pendente',
+              data_pagamento: item.data_pagamento || null
+            })
+            .eq('id', item.id);
+          if (restoreErr) throw restoreErr;
+        }
+      }
+
+      setLastUndoBanner(prev => {
+        if (!prev) return null;
+        if (undoPayload.logId && prev.logId === undoPayload.logId) return null;
+        if (!undoPayload.logId && prev === undoPayload) return null;
+        return prev;
+      });
+
+      toast.success('Alteração desfeita! Os pagamentos voltaram ao status anterior.');
+      await Promise.all([fetchResponsaveis(), loadRecentPaymentLogs()]);
+    } catch (err) {
+      toast.error('Erro ao desfazer alteração: ' + err.message);
+    } finally {
+      setIsUndoing(false);
+    }
+  }, [confirmDialog, fetchResponsaveis, loadRecentPaymentLogs, toast]);
+
   const aplicarBulkStatus = async () => {
     if (selectedIds.length === 0) {
       toast.warning('Selecione pelo menos um responsável para alterar o status.');
@@ -238,10 +305,23 @@ const ListaResponsaveis = () => {
 
     setIsBulkUpdating(true);
     try {
-      const dataPgto = bulkStatus === 'Pago' ? (bulkDataPagamento || new Date().toISOString().split('T')[0]) : null;
+      const dataPgto = bulkStatus === 'Pago' ? (bulkDataPagamento || todayLocalISO()) : null;
+      const selectedSet = new Set(selectedIds);
+      const snapshotItens = responsaveis
+        .filter(r => selectedSet.has(r.id))
+        .map(r => ({
+          id: r.id,
+          numero_os: r.numero_os,
+          nome: r.nome,
+          valor_total: getRecordTotal(r),
+          status_pagamento: r.status_pagamento || 'Pendente',
+          data_pagamento: r.data_pagamento || null
+        }));
+
+      const totalValorSelecionado = snapshotItens.reduce((acc, item) => acc + item.valor_total, 0);
 
       // 1. Tentar executar via RPC para auditoria completa
-      const { error: rpcError } = await supabase.rpc('atualizar_status_responsaveis_em_massa', {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('atualizar_status_responsaveis_em_massa', {
         p_ids: selectedIds,
         p_status: bulkStatus,
         p_data_pagamento: dataPgto
@@ -249,6 +329,7 @@ const ListaResponsaveis = () => {
 
       // 2. Fallback caso RPC ainda não exista no banco
       if (rpcError) {
+        console.warn('RPC atualizar_status_responsaveis_em_massa falhou, usando fallback direto:', rpcError);
         const updatePayload = {
           status_pagamento: bulkStatus,
           data_pagamento: dataPgto
@@ -262,9 +343,31 @@ const ListaResponsaveis = () => {
         if (fallbackError) throw fallbackError;
       }
 
-      toast.success(`Status "${bulkStatus}" atribuído com sucesso para ${selectedIds.length} ${selectedIds.length === 1 ? 'responsável' : 'responsáveis'}!`);
+      const logId = !rpcError && rpcData?.log_id ? rpcData.log_id : null;
+      const undoPayload = {
+        logId,
+        status: bulkStatus,
+        count: snapshotItens.length || selectedIds.length,
+        totalValor: totalValorSelecionado,
+        itens: snapshotItens,
+        createdAt: new Date().toISOString()
+      };
+
+      setLastUndoBanner(undoPayload);
       setSelectedIds([]);
-      await fetchResponsaveis();
+      await Promise.all([fetchResponsaveis(), loadRecentPaymentLogs()]);
+
+      toast.success(
+        `Status "${bulkStatus}" atribuído com sucesso para ${undoPayload.count} ${undoPayload.count === 1 ? 'pagamento' : 'pagamentos'} (${formatBRL(totalValorSelecionado)})!`,
+        'Sucesso',
+        {
+          duration: 10000,
+          action: {
+            label: 'Desfazer',
+            onClick: () => executeUndoPayload(undoPayload, { askConfirm: false })
+          }
+        }
+      );
     } catch (err) {
       toast.error('Erro ao atualizar status dos responsáveis: ' + err.message);
     } finally {
@@ -309,7 +412,60 @@ const ListaResponsaveis = () => {
           <h2>Pagamentos da Equipe</h2>
           <p className="text-muted">Acompanhe os pagamentos da equipe por OS ou consolidados por pessoa e confira os dados bancários para transferências</p>
         </div>
+        <div className="lista-header-actions">
+          {recentPaymentLogs.length > 0 && (
+            <button
+              type="button"
+              className="btn-undo-header"
+              onClick={() => setShowUndoModal(true)}
+              disabled={isUndoing}
+              title="Ver alterações em massa recentes e desfazer rapidamente"
+            >
+              <History size={16} />
+              <span>Desfazer Ações</span>
+              <span className="undo-count-pill">{recentPaymentLogs.length}</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* BANNER RÁPIDO DE DESFAZER APÓS AÇÃO EM MASSA */}
+      {lastUndoBanner && (
+        <div className="undo-quick-banner">
+          <div className="undo-quick-info">
+            <RotateCcw size={18} className="undo-quick-icon" />
+            <div>
+              <strong>
+                Última alteração: "{lastUndoBanner.status}" atribuído para {lastUndoBanner.count}{' '}
+                {lastUndoBanner.count === 1 ? 'pagamento' : 'pagamentos'} ({formatBRL(lastUndoBanner.totalValor)})
+              </strong>
+              <div className="undo-quick-sub">
+                {lastUndoBanner.itens.slice(0, 4).map(i => `${i.nome} (OS ${i.numero_os})`).join(' • ')}
+                {lastUndoBanner.itens.length > 4 && ` • +${lastUndoBanner.itens.length - 4} outro(s)`}
+              </div>
+            </div>
+          </div>
+          <div className="undo-quick-actions">
+            <button
+              type="button"
+              className="btn-undo-now"
+              onClick={() => executeUndoPayload(lastUndoBanner, { askConfirm: false })}
+              disabled={isUndoing}
+            >
+              <RotateCcw size={14} />
+              {isUndoing ? 'Desfazendo...' : 'Desfazer agora'}
+            </button>
+            <button
+              type="button"
+              className="btn-undo-dismiss"
+              onClick={() => setLastUndoBanner(null)}
+              title="Fechar aviso"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card list-card">
         {/* Barra de Filtros */}
@@ -782,7 +938,6 @@ const ListaResponsaveis = () => {
         )}
       </div>
 
-      {/* MODAL: CONFERIR E GERENCIAR DADOS BANCÁRIOS DO RESPONSÁVEL */}
       {/* MODAL DE DADOS BANCÁRIOS UNIFICADO */}
       <ModalDadosBancarios 
         isOpen={showBankModal}
@@ -794,6 +949,72 @@ const ListaResponsaveis = () => {
           await loadCadastrosBancarios();
         }}
       />
+
+      {/* MODAL: HISTÓRICO DE PAGAMENTOS EM MASSA PARA DESFAZER */}
+      {showUndoModal && (
+        <div className="modal-overlay" onClick={() => setShowUndoModal(false)}>
+          <div className="modal-content undo-history-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <History size={20} color="#0084ff" />
+                <h3 style={{ margin: 0 }}>Alterações Recentes em Massa (Desfazer)</h3>
+              </div>
+              <button type="button" className="btn-close" onClick={() => setShowUndoModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: 20, maxHeight: '75vh', overflowY: 'auto' }}>
+              {recentPaymentLogs.length === 0 ? (
+                <p className="text-muted" style={{ textAlign: 'center', padding: '20px 0' }}>
+                  Nenhuma alteração em massa pendente de reversão encontrada.
+                </p>
+              ) : (
+                <div className="undo-history-list">
+                  {recentPaymentLogs.map(log => {
+                    const itens = log.dados_antigos?.itens || [];
+                    return (
+                      <div key={log.id} className="undo-history-card">
+                        <div className="undo-history-card-top">
+                          <div>
+                            <div className="undo-history-title">{getAcaoResumo(log)}</div>
+                            <div className="undo-history-meta">
+                              {formatDateTime(log.created_at)} • {log.user_email || 'Sistema'} • Log #{log.id}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-undo-card"
+                            disabled={isUndoing}
+                            onClick={async () => {
+                              await executeUndoPayload({ logId: log.id, log }, { askConfirm: true });
+                              setShowUndoModal(false);
+                            }}
+                          >
+                            <RotateCcw size={14} />
+                            Desfazer
+                          </button>
+                        </div>
+                        {itens.length > 0 && (
+                          <div className="undo-history-items">
+                            {itens.map((item, idx) => (
+                              <span key={`${item.id || idx}-${item.numero_os}`} className="undo-item-chip">
+                                <strong>{item.nome}</strong> • OS {item.numero_os} • {formatBRL(item.valor_total)}{' '}
+                                <em className="undo-item-prev">
+                                  (era {item.status_pagamento || 'Pendente'})
+                                </em>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

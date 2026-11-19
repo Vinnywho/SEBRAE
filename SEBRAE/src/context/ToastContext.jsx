@@ -12,9 +12,9 @@ export const ToastProvider = ({ children }) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const addToast = useCallback(({ type = 'info', title, message, duration = 4000 }) => {
+  const addToast = useCallback(({ type = 'info', title, message, duration = 4000, action = null }) => {
     const id = Date.now() + Math.random().toString(36).substring(2, 9);
-    const newToast = { id, type, title, message };
+    const newToast = { id, type, title, message, action };
     setToasts((prev) => [...prev, newToast]);
 
     if (duration > 0) {
@@ -25,10 +25,10 @@ export const ToastProvider = ({ children }) => {
   }, [removeToast]);
 
   const toast = {
-    success: (message, title = 'Sucesso') => addToast({ type: 'success', title, message }),
-    error: (message, title = 'Erro') => addToast({ type: 'error', title, message, duration: 6000 }),
-    warning: (message, title = 'Atenção') => addToast({ type: 'warning', title, message }),
-    info: (message, title = 'Informação') => addToast({ type: 'info', title, message })
+    success: (message, title = 'Sucesso', options = {}) => addToast({ type: 'success', title, message, ...options }),
+    error: (message, title = 'Erro', options = {}) => addToast({ type: 'error', title, message, duration: 6000, ...options }),
+    warning: (message, title = 'Atenção', options = {}) => addToast({ type: 'warning', title, message, ...options }),
+    info: (message, title = 'Informação', options = {}) => addToast({ type: 'info', title, message, ...options })
   };
 
   const confirmDialog = ({
@@ -84,6 +84,18 @@ export const ToastProvider = ({ children }) => {
             <div className="toast-content">
               {t.title && <h5 className="toast-title">{t.title}</h5>}
               <p className="toast-message">{t.message}</p>
+              {t.action && (
+                <button
+                  type="button"
+                  className="toast-action-btn"
+                  onClick={() => {
+                    removeToast(t.id);
+                    t.action.onClick();
+                  }}
+                >
+                  {t.action.label}
+                </button>
+              )}
             </div>
             <button className="toast-close" onClick={() => removeToast(t.id)}>
               <X size={16} />

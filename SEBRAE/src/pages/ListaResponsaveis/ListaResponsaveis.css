@@ -800,3 +800,200 @@ th input[type="checkbox"] {
 .btn-refined-save:hover:not(:disabled) {
   background: #006bce;
 }
+
+/* Botão & Banner & Modal de Desfazer Ações */
+.lista-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-undo-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-undo-header:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+}
+
+.undo-count-pill {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.undo-quick-banner {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  animation: slideDown 0.2s ease-out;
+}
+
+.undo-quick-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #78350f;
+  font-size: 13px;
+  min-width: 0;
+  flex: 1;
+}
+
+.undo-quick-icon {
+  color: #d97706;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.undo-quick-sub {
+  font-size: 12px;
+  color: #92400e;
+  margin-top: 2px;
+  word-break: break-word;
+}
+
+.undo-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-undo-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #d97706;
+  color: #ffffff;
+  border: none;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-undo-now:hover:not(:disabled) {
+  background: #b45309;
+}
+
+.btn-undo-dismiss {
+  background: transparent;
+  border: none;
+  color: #92400e;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.btn-undo-dismiss:hover {
+  background: rgba(180, 83, 9, 0.1);
+}
+
+.undo-history-modal {
+  max-width: 720px;
+  width: 92vw;
+}
+
+.undo-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.undo-history-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #f8fafc;
+}
+
+.undo-history-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.undo-history-title {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.undo-history-meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.btn-undo-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-undo-card:hover:not(:disabled) {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.undo-history-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.undo-item-chip {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #334155;
+}
+
+.undo-item-prev {
+  font-style: normal;
+  color: #64748b;
+  font-size: 11px;
+}

@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext';
 import { getDayOfWeek, formatBRL } from '../../utils/format';
 import { Edit2, Trash2, Plus, ArrowLeft, Save, Edit, Printer, Landmark, UserPlus } from 'lucide-react';
 import { fetchCadastrosBancarios, saveCadastroBancario } from '../../services/bancarioService';
+import { undoAuditLog } from '../../services/auditService';
 import ModalDadosBancarios from '../../components/ModalDadosBancarios/ModalDadosBancarios';
 import sebraeLogo from '../../assets/img/sebrae.svg';
 import './OSForm.css';
@@ -48,6 +49,7 @@ const OSForm = () => {
   const [isLoading, setIsLoading] = useState(!!osEditId);
   const [isSaving, setIsSaving] = useState(false);
   const [lastEdited, setLastEdited] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [formData, setFormData] = useState({
     numeroOS: '', lote: '', nomeOS: '', cidade: '', endereco: '', adicionais: '', observacoes: '',
@@ -180,7 +182,7 @@ const OSForm = () => {
       }
     };
     fetchOSData();
-  }, [osEditId, navigate]);
+  }, [osEditId, navigate, reloadKey]);
 
   // Sync Responsáveis list with Detalhes
   useEffect(() => {
@@ -425,7 +427,7 @@ const OSForm = () => {
         agendamento: r.agendamento, status_pagamento: r.statusPagamento, data_pagamento: r.dataPagamento
       }));
 
-      const { error } = await supabase.rpc('salvar_os', {
+      const { data: saveResult, error } = await supabase.rpc('salvar_os', {
         p_os: payloadOs, p_detalhes: payloadDet, p_responsaveis: payloadResp, p_is_novo: !osEditId
       });
       
@@ -433,7 +435,34 @@ const OSForm = () => {
         if(error.code === '23505') throw new Error("O número de OS já existe.");
         throw error;
       }
-      toast.success("Ordem de Serviço salva com sucesso!");
+
+      const logId = saveResult?.log_id;
+      const acao = saveResult?.acao;
+      toast.success(
+        "Ordem de Serviço salva com sucesso!",
+        "Sucesso",
+        logId
+          ? {
+              duration: 10000,
+              action: {
+                label: 'Desfazer',
+                onClick: async () => {
+                  try {
+                    await undoAuditLog(logId);
+                    toast.success('Alteração na OS desfeita com sucesso!');
+                    if (acao === 'CRIACAO') {
+                      navigate('/lista-os');
+                    } else {
+                      setReloadKey(k => k + 1);
+                    }
+                  } catch (undoErr) {
+                    toast.error('Erro ao desfazer alteração: ' + undoErr.message);
+                  }
+                }
+              }
+            }
+          : {}
+      );
       if (!osEditId) navigate(`/os-form?id=${formData.numeroOS}`);
     } catch (err) {
       toast.error("Erro ao salvar: " + err.message);
